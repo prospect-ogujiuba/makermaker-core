@@ -1,0 +1,29 @@
+<?php
+
+namespace {{namespace}};
+
+use TypeRocket\Models\AuthUser;
+use TypeRocket\Auth\Policy;
+
+class {{class}} extends Policy
+{
+    public function create(AuthUser $auth, $object)
+    {
+        return $auth->isCapable('manage_{{capability}}');
+    }
+
+    public function read(AuthUser $auth, $object)
+    {
+        return $auth->isCapable('manage_{{capability}}');
+    }
+
+    public function update(AuthUser $auth, $object)
+    {
+        return $auth->isCapable('manage_{{capability}}');
+    }
+
+    public function destroy(AuthUser $auth, $object)
+    {
+        return $auth->isCapable('manage_{{capability}}');
+    }
+}

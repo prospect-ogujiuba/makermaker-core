@@ -1,0 +1,25 @@
+{
+  "name": "mxcro/makermaker-core",
+  "description": "Core library for scaffolding TypeRocket CRUD applications",
+  "type": "library",
+  "license": "GPL-2.0-or-later",
+  "authors": [
+    {
+      "name": "MXCRO",
+      "email": "dev@mxcro.com"
+    }
+  ],
+  "require": {
+    "php": "^8.2"
+  },
+  "autoload": {
+    "psr-4": {
+      "MakerMaker\\": "src/"
+    },
+    "files": [
+      "src/helpers.php"
+    ]
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}
