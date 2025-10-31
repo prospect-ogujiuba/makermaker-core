@@ -1,0 +1,63 @@
+<?php
+
+namespace {{namespace}};
+
+use TypeRocket\Http\Fields;
+use TypeRocket\Http\Request;
+
+class {{class}} extends Fields
+{
+    /**
+     * Run On Import
+     *
+     * Validate and then redirect on failure with errors, immediately
+     * when imported by the application container resolver.
+     *
+     * @var bool
+     */
+    protected $run = true;
+
+    /**
+     * Model Fillable Property Override
+     *
+     * @return array
+     */
+    protected function fillable()
+    {
+        return [];
+    }
+
+    /**
+     * Validation Rules
+     *
+     * @return array
+     */
+    protected function rules()
+    {
+        $request = Request::new();
+        $route_args = $request->getDataGet('route_args');
+        $id = $route_args[0] ?? null;
+        $wpdb_prefix = GLOBAL_WPDB_PREFIX;
+
+        $rules = [];
+
+        // Add your validation rules here
+        // Example:
+        // $rules['name'] = "unique:name:{$wpdb_prefix}{{table_name}}@id:{$id}|required|max:255";
+
+        $rules['title'] = "unique:title:{$wpdb_prefix}{{table_name}}@id:{$id}|required|max:64";
+        $rules['description'] = "unique:description:{$wpdb_prefix}{{table_name}}@id:{$id}|max:255";
+
+        return $rules;
+    }
+
+    /**
+     * Custom Error Messages
+     *
+     * @return array
+     */
+    protected function messages()
+    {
+        return [];
+    }
+}

@@ -1,0 +1,38 @@
+<?php
+
+namespace {{namespace}};
+
+use TypeRocket\Models\Model;
+use TypeRocket\Models\WPUser;
+
+class {{class}} extends Model
+{
+    protected $resource = '{{table_name}}';
+
+    protected $fillable = [
+        // Add your fillable fields here
+        'title',
+        'description'
+    ];
+
+    protected $guard = [
+        'id',
+        'created_at',
+        'updated_at',
+        'deleted_at',
+        'created_by',
+        'updated_by'
+    ];
+
+    /** Created by WP user */
+    public function createdBy()
+    {
+        return $this->belongsTo(WPUser::class, 'created_by');
+    }
+
+    /** Updated by WP user */
+    public function updatedBy()
+    {
+        return $this->belongsTo(WPUser::class, 'updated_by');
+    }
+}
