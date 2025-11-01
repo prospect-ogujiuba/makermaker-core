@@ -1,0 +1,27 @@
+node_modules/
+.env
+package-lock.json
+
+# Composer
+/vendor/
+composer.phar
+
+# Testing
+.phpunit.result.cache
+/coverage/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# SQL Zone Identifier
+*.sql:Zone.Identifier

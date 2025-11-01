@@ -1,5 +1,5 @@
 {
-  "name": "{{org}}/{{slug}}",
+  "name": "makermaker/plugin",
   "description": "Thin Client Makermaker Plugin",
   "type": "wordpress-plugin",
   "license": "GPL-2.0-or-later",
@@ -17,12 +17,12 @@
   "prefer-stable": true,
   "autoload": {
     "psr-4": {
-      "{{namespace}}\\": "src/"
+      "MakerMaker\\": "app/"
     }
   },
   "autoload-dev": {
     "psr-4": {
-      "{{namespace}}\\Tests\\": "tests/"
+      "MakerMaker\\Tests\\": "tests/"
     }
   },
   "scripts": {
