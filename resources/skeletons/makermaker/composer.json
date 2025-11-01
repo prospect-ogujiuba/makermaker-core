@@ -1,11 +1,11 @@
 {
-  "name": "makermaker/plugin",
+  "name": "{{org}}/{{slug}}",
   "description": "Thin Client Makermaker Plugin",
   "type": "wordpress-plugin",
   "license": "GPL-2.0-or-later",
   "require": {
     "php": "^8.2",
-    "mxcro/makermaker-core": "^0.1.0"
+    "mxcro/makermaker-core": "dev-master"
   },
   "require-dev": {
     "phpunit/phpunit": "^10.5",
@@ -17,12 +17,12 @@
   "prefer-stable": true,
   "autoload": {
     "psr-4": {
-      "MakerMaker\\": "app/"
+      "{{namespace}}\\": "src/"
     }
   },
   "autoload-dev": {
     "psr-4": {
-      "MakerMaker\\Tests\\": "tests/"
+      "{{namespace}}\\Tests\\": "tests/"
     }
   },
   "scripts": {
