@@ -87,7 +87,7 @@ class MakeClient extends Command
 
     protected function copySkeletonFiles($pluginPath, $replacements)
     {
-        $skeletonPath = __DIR__ . '/../../resources/skeletons/client-plugin';
+        $skeletonPath = __DIR__ . '/../../resources/skeletons/makermaker';
 
         $files = [
             'composer.json',
