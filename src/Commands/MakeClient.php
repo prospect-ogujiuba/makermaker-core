@@ -37,11 +37,11 @@ class MakeClient extends Command
         $this->info("Slug: {$slug}");
         $this->info("Organization: {$org}");
         $this->info("Path: {$pluginPath}");
-        
+
         // Create directory structure
         $this->createDirectoryStructure($pluginPath);
 
-        // Generate files from skeleton
+        // Generate files from boilerplate
         $namespace = $this->toNamespace($slug);
         $constantPrefix = strtoupper(str_replace('-', '_', $slug));
 
@@ -55,7 +55,7 @@ class MakeClient extends Command
             '{{constant_prefix}}' => $constantPrefix,
         ];
 
-        $this->copySkeletonFiles($pluginPath, $replacements);
+        $this->copyBoilerplateFiles($pluginPath, $replacements);
 
         $this->line('');
         $this->success("✓ Client plugin created: {$pluginPath}");
@@ -85,9 +85,9 @@ class MakeClient extends Command
         }
     }
 
-    protected function copySkeletonFiles($pluginPath, $replacements)
+    protected function copyBoilerplateFiles($pluginPath, $replacements)
     {
-        $skeletonPath = __DIR__ . '/../../resources/skeletons/makermaker';
+        $boilerplatePath = __DIR__ . '/../../resources/boilerplates/makermaker';
 
         $files = [
             'composer.json',
@@ -97,11 +97,11 @@ class MakeClient extends Command
         ];
 
         foreach ($files as $file) {
-            $source = $skeletonPath . '/' . $file;
+            $source = $boilerplatePath . '/' . $file;
             $dest = $pluginPath . '/' . $file;
 
             if (!file_exists($source)) {
-                $this->warning("Skeleton file not found: {$file}");
+                $this->warning("Boilerplate file not found: {$file}");
                 continue;
             }
 
