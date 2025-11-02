@@ -36,21 +36,20 @@ class Crud extends Command
 		// Case transforms
 		$pascalCase       = $this->toPascalCase($name);
 		$snakeCase        = $this->toSnakeCase($name);
-		$pluralSnakeCase  = pluralize($snakeCase);
+		$pluralSnakeCase  = $this->pluralize($snakeCase);
 		$variable         = lcfirst($pascalCase);
-		$pluralVariable   = pluralize($variable);
+		$pluralVariable   = $this->pluralize($variable);
 		$pluralClass      = $this->toPascalCase($pluralSnakeCase);
 		$pluralTitle      = ucwords(str_replace('_', ' ', $pluralSnakeCase));
-		$titleCase        = toTitleCase($pascalCase);
-		$pluralTitleCase  = toTitleCase($pluralClass);
+		$titleCase        = $this->toTitleCase($pascalCase);
+		$pluralTitleCase  = $this->toTitleCase($pluralClass);
 
 		$this->info("Generating CRUD files for: {$pascalCase}");
 		$this->info("Template variant: {$template}");
 		$this->info("Table name: {$pluralSnakeCase}");
 
-		// Get paths from Boot
-		$paths = \MakerMaker\Boot::getPaths();
-		$plugin_dir = $paths['plugin_dir'] ?? getcwd();
+		// Get plugin directory
+		$plugin_dir = $this->getPluginDirectory();
 
 		if ($module) {
 			$base_path = $plugin_dir . "/modules/{$module}";
@@ -137,9 +136,58 @@ class Crud extends Command
 		}
 	}
 
+	/**
+	 * Get the path to a template file
+	 * Looks in vendor directory first, then falls back to local templates
+	 */
+	protected function getTemplatePath($templateName, $variant = 'standard')
+	{
+		// Build list of possible template locations in priority order
+		$searchPaths = [];
+		
+		// 1. First check vendor directory (installed via Composer)
+		$vendorPaths = $this->getPossibleVendorPaths();
+		foreach ($vendorPaths as $vendorPath) {
+			if (is_dir($vendorPath . '/mxcro/makermaker-core')) {
+				// Try variant-specific template
+				$searchPaths[] = $vendorPath . '/mxcro/makermaker-core/resources/templates/' . $variant . '/' . $templateName;
+				// Fallback to standard variant in vendor
+				if ($variant !== 'standard') {
+					$searchPaths[] = $vendorPath . '/mxcro/makermaker-core/resources/templates/standard/' . $templateName;
+				}
+			}
+		}
+		
+		// 2. Check plugin's local templates (for customization)
+		$plugin_dir = $this->getPluginDirectory();
+		$searchPaths[] = $plugin_dir . '/resources/templates/' . $variant . '/' . $templateName;
+		if ($variant !== 'standard') {
+			$searchPaths[] = $plugin_dir . '/resources/templates/standard/' . $templateName;
+		}
+		
+		// 3. Fallback to relative path from this file (development mode)
+		$searchPaths[] = __DIR__ . '/../../resources/templates/' . $variant . '/' . $templateName;
+		if ($variant !== 'standard') {
+			$searchPaths[] = __DIR__ . '/../../resources/templates/standard/' . $templateName;
+		}
+		
+		// Search for the template
+		foreach ($searchPaths as $path) {
+			if (file_exists($path)) {
+				return $path;
+			}
+		}
+		
+		// Template not found - provide helpful error message
+		throw new \Exception(
+			"Template not found: {$templateName} (variant: {$variant})\n" .
+			"Ensure makermaker-core is installed via composer or templates exist locally."
+		);
+	}
+
 	protected function ensureModuleStructure($path, $module)
 	{
-		$dirs = ['Controllers', 'Models', 'Auth', 'Http/Fields', 'resources'];
+		$dirs = ['Controllers', 'Models', 'Auth', 'Http/Fields', 'resources/views'];
 		foreach ($dirs as $dir) {
 			$full_path = "{$path}/{$dir}";
 			if (!is_dir($full_path)) {
@@ -149,7 +197,7 @@ class Crud extends Command
 		}
 	}
 
-	protected function updateModuleMetadata($module, $pascalCase, $snakeCase, $plugin_dir, array $results = [])
+	protected function updateModuleMetadata($module, $pascalCase, $snakeCase, $plugin_dir)
 	{
 		$metadataFile = $plugin_dir . "/modules/{$module}/module.json";
 
@@ -162,81 +210,25 @@ class Crud extends Command
 				'namespace' => $this->getGalaxyMakeNamespace() . '\\Modules\\' . $this->toPascalCase($module),
 				'description' => 'Module description',
 				'version' => '1.0.0',
-				'author' => get_bloginfo('name') ?: 'Your Name',
-				'active' => false,
+				'author' => 'Your Name',
+				'active' => true,
 				'dependencies' => [],
-				'conflicts' => [],
-				'files' => [
-					'controllers' => [],
-					'models' => [],
-					'policies' => [],
-					'fields' => [],
-					'resources' => [],
-					'migrations' => [],
-					'views' => []
-				],
-				'autoload' => [
-					'psr-4' => [
-						$this->getGalaxyMakeNamespace() . '\\Modules\\' . $this->toPascalCase($module) . '\\' => '.'
-					]
-				],
+				'resources' => [],
 				'capabilities' => []
 			];
 		}
 
-		// Add files from generation results
-		foreach ($results as $type => $files) {
-			if (!isset($metadata['files'][$type])) {
-				continue;
-			}
-
-			if (is_array($files)) {
-				foreach ($files as $file) {
-					$filename = basename($file);
-					if (!in_array($filename, $metadata['files'][$type])) {
-						$metadata['files'][$type][] = $filename;
-					}
-				}
-			} else {
-				$filename = basename($files);
-				if (!in_array($filename, $metadata['files'][$type])) {
-					$metadata['files'][$type][] = $filename;
-				}
-			}
-		}
-
-		// Add controller
-		$controllerFile = "{$pascalCase}Controller.php";
-		if (!in_array($controllerFile, $metadata['files']['controllers'])) {
-			$metadata['files']['controllers'][] = $controllerFile;
-		}
-
-		// Add model
-		$modelFile = "{$pascalCase}.php";
-		if (!in_array($modelFile, $metadata['files']['models'])) {
-			$metadata['files']['models'][] = $modelFile;
-		}
-
-		// Add policy
-		$policyFile = "{$pascalCase}Policy.php";
-		if (!in_array($policyFile, $metadata['files']['policies'])) {
-			$metadata['files']['policies'][] = $policyFile;
-		}
-
-		// Add fields
-		$fieldsFile = "{$pascalCase}Fields.php";
-		if (!in_array($fieldsFile, $metadata['files']['fields'])) {
-			$metadata['files']['fields'][] = $fieldsFile;
-		}
-
 		// Add resource
-		$resourceFile = "{$snakeCase}.php";
-		if (!in_array($resourceFile, $metadata['files']['resources'])) {
-			$metadata['files']['resources'][] = $resourceFile;
-		}
-
+		$resource = [
+			'name' => $pascalCase,
+			'type' => 'crud',
+			'table' => $this->pluralize($snakeCase)
+		];
+		
+		$metadata['resources'][] = $resource;
+		
 		// Add capability
-		$capability = 'manage_' . pluralize($snakeCase);
+		$capability = 'manage_' . $this->pluralize($snakeCase);
 		if (!in_array($capability, $metadata['capabilities'])) {
 			$metadata['capabilities'][] = $capability;
 		}
@@ -264,12 +256,10 @@ class Crud extends Command
 		}
 
 		if ($this->skipIfExists($resourceFile, $force, 'Resource')) {
-			return $module
-				? "modules/{$module}/resources/{$snakeCase}.php"
-				: "inc/resources/{$snakeCase}.php";
+			return null;
 		}
 
-		$pluralSnakeCase = pluralize($snakeCase);
+		$pluralSnakeCase = $this->pluralize($snakeCase);
 
 		$tags = ['{{class}}', '{{singular}}', '{{variable}}', '{{plural_title}}', '{{plural_snake}}'];
 		$replacements = [$className, $snakeCase, $variable, $pluralTitle, $pluralSnakeCase];
@@ -293,7 +283,7 @@ class Crud extends Command
 		$timestamp = time();
 		$fileName = "{$timestamp}.{$migrationName}.sql";
 
-		$root = \TypeRocket\Core\Config::get('paths.migrations');
+		$root = $plugin_dir . '/database/migrations';
 		if (!file_exists($root)) {
 			mkdir($root, 0755, true);
 		}
@@ -301,7 +291,7 @@ class Crud extends Command
 		$migrationFile = $root . '/' . $fileName;
 
 		if ($this->skipIfExists($migrationFile, $force, 'Migration')) {
-			return "database/migrations/" . basename($migrationFile);
+			return null;
 		}
 
 		$tags = ['{{table_name}}', '{{description}}', '{{comment}}'];
@@ -332,7 +322,7 @@ class Crud extends Command
 		$modelFile = $modelsDir . '/' . $className . '.php';
 
 		if ($this->skipIfExists($modelFile, $force, 'Model')) {
-			return basename(dirname(dirname($modelFile))) . '/' . basename(dirname($modelFile)) . '/' . basename($modelFile);
+			return null;
 		}
 
 		$tags = ['{{namespace}}', '{{class}}', '{{table_name}}'];
@@ -350,7 +340,7 @@ class Crud extends Command
 			throw new \Exception("Failed to generate Model");
 		}
 
-		return basename(dirname(dirname($modelFile))) . '/' . basename(dirname($modelFile)) . '/' . basename($modelFile);
+		return str_replace($this->getPluginDirectory() . '/', '', $modelFile);
 	}
 
 	protected function generatePolicy($className, $snakeCase, $appNamespace, $basePath, $force = false, $template = 'standard')
@@ -365,10 +355,10 @@ class Crud extends Command
 		$policyFile = $authDir . '/' . $policyName . '.php';
 
 		if ($this->skipIfExists($policyFile, $force, 'Policy')) {
-			return basename(dirname(dirname($policyFile))) . '/' . basename(dirname($policyFile)) . '/' . basename($policyFile);
+			return null;
 		}
 
-		$capability = pluralize($snakeCase);
+		$capability = $this->pluralize($snakeCase);
 
 		$tags = ['{{namespace}}', '{{class}}', '{{capability}}'];
 		$replacements = [
@@ -385,7 +375,7 @@ class Crud extends Command
 			throw new \Exception("Failed to generate Policy");
 		}
 
-		return basename(dirname(dirname($policyFile))) . '/' . basename(dirname($policyFile)) . '/' . basename($policyFile);
+		return str_replace($this->getPluginDirectory() . '/', '', $policyFile);
 	}
 
 	protected function generateFields($className, $tableName, $appNamespace, $basePath, $force = false, $template = 'standard')
@@ -400,7 +390,7 @@ class Crud extends Command
 		$fieldsFile = $fieldsDir . '/' . $fieldsName . '.php';
 
 		if ($this->skipIfExists($fieldsFile, $force, 'Fields')) {
-			return basename(dirname(dirname(dirname($fieldsFile)))) . '/' . basename(dirname(dirname($fieldsFile))) . '/' . basename(dirname($fieldsFile)) . '/' . basename($fieldsFile);
+			return null;
 		}
 
 		$tags = ['{{namespace}}', '{{class}}', '{{table_name}}'];
@@ -418,7 +408,7 @@ class Crud extends Command
 			throw new \Exception("Failed to generate Fields");
 		}
 
-		return basename(dirname(dirname(dirname($fieldsFile)))) . '/' . basename(dirname(dirname($fieldsFile))) . '/' . basename(dirname($fieldsFile)) . '/' . basename($fieldsFile);
+		return str_replace($this->getPluginDirectory() . '/', '', $fieldsFile);
 	}
 
 	protected function generateController($className, $variable, $pluralVariable, $viewPath, $appNamespace, $basePath, $force = false, $template = 'standard')
@@ -433,7 +423,7 @@ class Crud extends Command
 		$controllerFile = $controllersDir . '/' . $controllerName . '.php';
 
 		if ($this->skipIfExists($controllerFile, $force, 'Controller')) {
-			return basename(dirname(dirname($controllerFile))) . '/' . basename(dirname($controllerFile)) . '/' . basename($controllerFile);
+			return null;
 		}
 
 		$routeName = $this->toSnakeCase($className);
@@ -465,7 +455,7 @@ class Crud extends Command
 			throw new \Exception("Failed to generate Controller");
 		}
 
-		return basename(dirname(dirname($controllerFile))) . '/' . basename(dirname($controllerFile)) . '/' . basename($controllerFile);
+		return str_replace($this->getPluginDirectory() . '/', '', $controllerFile);
 	}
 
 	protected function generateViews($viewPath, $className, $pluralClass, $variable, $titleCase, $pluralTitleCase, $appNamespace, $module = null, $force = false, $template = 'standard', $which = null, $plugin_dir = null)
@@ -473,9 +463,7 @@ class Crud extends Command
 		if ($module) {
 			$viewsDir = $plugin_dir . "/modules/{$module}/resources/views/{$viewPath}";
 		} else {
-			$paths = \MakerMaker\Boot::getPaths();
-			$viewsPath = $paths['views_path'] ?? $plugin_dir . '/resources/views';
-			$viewsDir = "{$viewsPath}/{$viewPath}";
+			$viewsDir = $plugin_dir . "/resources/views/{$viewPath}";
 		}
 
 		if (!is_dir($viewsDir)) {
@@ -489,7 +477,7 @@ class Crud extends Command
 
 		$generatedFiles = [];
 
-		// index
+		// Generate index view
 		if ($doIndex && !$this->skipIfExists($indexFile, $force, 'View (index)')) {
 			$tags = ['{{class}}', '{{app_namespace}}', '{{title_class}}'];
 			$replacements = [$className, $appNamespace, $titleCase];
@@ -501,10 +489,10 @@ class Crud extends Command
 				throw new \Exception("Failed to generate Index view");
 			}
 
-			$generatedFiles[] = 'views/' . $viewPath . '/index.php';
+			$generatedFiles[] = str_replace($plugin_dir . '/', '', $indexFile);
 		}
 
-		// form
+		// Generate form view
 		if ($doForm && !$this->skipIfExists($formFile, $force, 'View (form)')) {
 			$tags = [
 				'{{class}}',
@@ -530,45 +518,123 @@ class Crud extends Command
 				throw new \Exception("Failed to generate Form view");
 			}
 
-			$generatedFiles[] = 'views/' . $viewPath . '/form.php';
+			$generatedFiles[] = str_replace($plugin_dir . '/', '', $formFile);
 		}
 
 		return $generatedFiles;
 	}
 
-	protected function getTemplatePath($templateName, $variant = 'standard')
+	/**
+	 * Get possible vendor directory paths
+	 */
+	protected function getPossibleVendorPaths()
 	{
-		// Try core library templates first
-		$config = defined('MAKERMAKER_CONFIG') ? MAKERMAKER_CONFIG : [];
-		$corePath = $config['paths']['templates'] ?? __DIR__ . '/../../resources/templates';
+		$paths = [];
 		
-		$template_path = $corePath . "/{$variant}/{$templateName}";
-
-		if (!file_exists($template_path)) {
-			// Fallback to standard
-			$template_path = $corePath . "/standard/{$templateName}";
+		// Check common vendor locations
+		$checkPaths = [
+			getcwd() . '/vendor',
+			dirname(getcwd()) . '/vendor',
+			__DIR__ . '/../../../../vendor', // If this command is in vendor
+			__DIR__ . '/../../../vendor',    // Alternative vendor location
+		];
+		
+		// Add plugin-specific vendor path
+		if (defined('MAKERMAKER_PLUGIN_DIR')) {
+			$checkPaths[] = MAKERMAKER_PLUGIN_DIR . '/vendor';
 		}
-
-		if (!file_exists($template_path)) {
-			throw new \Exception("Template not found: {$templateName}");
+		
+		// Add WordPress plugin paths
+		if (defined('WP_PLUGIN_DIR')) {
+			$checkPaths[] = WP_PLUGIN_DIR . '/makermaker/vendor';
 		}
-
-		return $template_path;
+		
+		// Filter to only existing directories
+		foreach ($checkPaths as $path) {
+			if (is_dir($path)) {
+				$paths[] = realpath($path);
+			}
+		}
+		
+		return array_unique($paths);
 	}
 
+	/**
+	 * Get the plugin directory
+	 */
+	protected function getPluginDirectory()
+	{
+		// Try different ways to get plugin directory
+		if (defined('MAKERMAKER_PLUGIN_DIR')) {
+			return MAKERMAKER_PLUGIN_DIR;
+		}
+		
+		if (class_exists('\MakerMaker\Boot')) {
+			$paths = \MakerMaker\Boot::getPaths();
+			if (!empty($paths['plugin_dir'])) {
+				return $paths['plugin_dir'];
+			}
+		}
+		
+		// Fallback to current working directory
+		return getcwd();
+	}
+
+	/**
+	 * Helper: Convert to PascalCase
+	 */
 	protected function toPascalCase($string)
 	{
 		return str_replace(' ', '', ucwords(str_replace(array('_', '-'), ' ', $string)));
 	}
 
+	/**
+	 * Helper: Convert to snake_case
+	 */
 	protected function toSnakeCase($string)
 	{
 		return strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $string));
 	}
 
+	/**
+	 * Helper: Convert to Title Case
+	 */
+	protected function toTitleCase($string)
+	{
+		// Handle PascalCase
+		if (strpos($string, '_') === false && strpos($string, ' ') === false) {
+			$result = preg_replace('/(?<!^)([A-Z])/', ' $1', $string);
+			return trim($result);
+		}
+		
+		return ucwords(str_replace('_', ' ', $string));
+	}
+
+	/**
+	 * Helper: Pluralize a word
+	 */
+	protected function pluralize($word)
+	{
+		// Use TypeRocket's Inflect if available
+		if (class_exists('\TypeRocket\Utility\Inflect')) {
+			return \TypeRocket\Utility\Inflect::pluralize($word);
+		}
+		
+		// Simple fallback pluralization
+		if (substr($word, -1) === 'y') {
+			return substr($word, 0, -1) . 'ies';
+		} elseif (substr($word, -1) === 's') {
+			return $word . 'es';
+		} else {
+			return $word . 's';
+		}
+	}
+
+	/**
+	 * Skip if file exists and not forcing
+	 */
 	protected function skipIfExists(string $path, $force, string $label): bool
 	{
-		$force = (bool) $force;
 		if (file_exists($path) && !$force) {
 			$this->warning("{$label} already exists, skipping: " . basename($path));
 			return true;
@@ -576,6 +642,9 @@ class Crud extends Command
 		return false;
 	}
 
+	/**
+	 * Parse list option from command line
+	 */
 	protected function parseListOption($value): array
 	{
 		if ($value === null || $value === '') {
@@ -585,6 +654,9 @@ class Crud extends Command
 		return array_values(array_filter(array_map('trim', $parts)));
 	}
 
+	/**
+	 * Normalize target names
+	 */
 	protected function normalizeTargets(array $keys): array
 	{
 		$expanded = [];
@@ -594,8 +666,6 @@ class Crud extends Command
 					$expanded[] = 'views:index';
 					$expanded[] = 'views:form';
 					break;
-				case 'except':
-					break;
 				default:
 					$expanded[] = $k;
 			}
@@ -603,6 +673,9 @@ class Crud extends Command
 		return array_values(array_unique($expanded));
 	}
 
+	/**
+	 * Resolve which steps to run based on options
+	 */
 	protected function resolveStepsToRun(array $allSteps, array $only, array $exclude): array
 	{
 		$only = $this->normalizeTargets($only);
