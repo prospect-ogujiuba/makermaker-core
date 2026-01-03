@@ -142,6 +142,16 @@ function validateEnumOption($value, $encodedOptions)
 }
 
 /**
+ * Validates that a value exists in a predefined list (enum/whitelist validation)
+ *
+ * Usage in validation rules: 'field' => 'callback:checkInList:value1,value2,value3'
+ */
+function checkInList($args)
+{
+    return ValidationHelper::checkInList($args);
+}
+
+/**
  * ============================================================================
  * DATABASE HELPERS
  * ============================================================================

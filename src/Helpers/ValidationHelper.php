@@ -217,4 +217,75 @@ class ValidationHelper
 
         return in_array((string)$value, $validOptions, true);
     }
+
+    /**
+     * Validates that a value exists in a predefined list (enum/whitelist validation)
+     *
+     * This validator provides enum validation for TypeRocket form fields.
+     * TypeRocket doesn't have a built-in 'in:' validator, so this callback fills that gap.
+     *
+     * Usage in validation rules:
+     * - 'field' => 'callback:checkInList:value1,value2,value3'
+     * - 'field' => 'required|callback:checkInList:draft,pending,approved'
+     * - 'field' => '?callback:checkInList:low,normal,high,urgent' (optional field)
+     *
+     * @param array $args Standard TypeRocket validator args array
+     * @return bool|string True if valid, error message string if invalid
+     */
+    public static function checkInList(array $args)
+    {
+        /**
+         * @var $option - The function name (checkInList)
+         * @var $option2 - First value in comma-separated list
+         * @var $option3 - Second value (and beyond are concatenated with commas)
+         * @var $field_name - Field name for error messages
+         * @var $value - The value being validated
+         * @var $weak - Whether this is an optional field
+         * @var \TypeRocket\Utility\Validator $validator
+         */
+        extract($args);
+
+        // Handle optional/nullable fields
+        if (isset($weak) && $weak && \TypeRocket\Utility\Data::emptyOrBlankRecursive($value)) {
+            return true;
+        }
+
+        // If no value provided and field is optional, it's valid
+        if ($value === null || $value === '' || (is_string($value) && trim($value) === '')) {
+            return true;
+        }
+
+        // Build the allowed values array from $option2, $option3, etc.
+        // TypeRocket passes comma-separated values as: option2=value1, option3=value2, ...
+        $allowedValues = [];
+
+        // Collect all option values (option2, option3, option4, etc.)
+        $optionIndex = 2;
+        while (isset($args["option{$optionIndex}"])) {
+            $allowedValues[] = $args["option{$optionIndex}"];
+            $optionIndex++;
+        }
+
+        // If no allowed values found, validation fails
+        if (empty($allowedValues)) {
+            return ' has no valid options defined';
+        }
+
+        // Convert value to string for comparison
+        $valueStr = (string) $value;
+
+        // Check both strict and loose comparison to handle '1' vs 1 type mismatches
+        if (in_array($valueStr, $allowedValues, true)) {
+            return true;
+        }
+
+        // Try loose comparison for numeric strings
+        if (in_array($valueStr, $allowedValues, false)) {
+            return true;
+        }
+
+        // Value not found in list - return error message
+        $allowedList = implode(', ', $allowedValues);
+        return " must be one of: {$allowedList}";
+    }
 }
