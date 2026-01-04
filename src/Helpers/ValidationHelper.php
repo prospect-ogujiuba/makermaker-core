@@ -229,7 +229,7 @@ class ValidationHelper
     /**
      * Validates that a value exists in a predefined list (enum/whitelist validation)
      *
-     * This validator provides enum validation for TypeRocket form fields with three progressive modes:
+     * This validator provides enum validation for TypeRocket form fields with two modes:
      *
      * MODE 1 - Explicit list (backward compatible):
      *   'field' => 'callback:checkInList:value1,value2,value3'
@@ -239,11 +239,6 @@ class ValidationHelper
      *   'field' => 'callback:checkInList:ModelName'
      *   Reflects the model's ENUM column for this field name, extracts allowed values.
      *   Example: 'approval_status' => 'callback:checkInList:ServicePrice'
-     *
-     * MODE 3 - Full auto-magic reflection:
-     *   'field' => 'callback:checkInList'
-     *   Automatically detects model from validation context and field name, reflects ENUM.
-     *   Zero configuration required - ENUM changes in migrations automatically apply.
      *
      * @param array $args Standard TypeRocket validator args array
      * @return bool|string True if valid, error message string if invalid
@@ -303,16 +298,8 @@ class ValidationHelper
                 $allowedValues = self::getEnumValuesFromModel($modelClass, $columnName);
             }
         } else {
-            // MODE 3: Full auto-detection
-            $mode = 'auto';
-            $modelClass = self::detectModelContext($validator);
-
-            if (!$modelClass) {
-                return ' validation error: Unable to auto-detect model class. Use explicit mode.';
-            }
-
-            // Use raw column name for database reflection
-            $allowedValues = self::getEnumValuesFromModel($modelClass, $columnName);
+            // No parameter provided - requires explicit list or model name
+            return ' validation error: checkInList requires explicit list or model name parameter';
         }
 
         // Handle reflection errors
@@ -340,33 +327,6 @@ class ValidationHelper
         // Value not found in list - return error message
         $allowedList = implode(', ', $allowedValues);
         return " must be one of: {$allowedList}";
-    }
-
-    /**
-     * Detect model class from validation context
-     *
-     * Extracts the model class being validated from the TypeRocket validator instance.
-     *
-     * @param \TypeRocket\Utility\Validator $validator TypeRocket validator instance
-     * @return string|null Model class name or null if not found
-     */
-    protected static function detectModelContext($validator)
-    {
-        if (!$validator) {
-            return null;
-        }
-
-        // TypeRocket stores model class in protected $modelClass property
-        try {
-            $reflection = new \ReflectionClass($validator);
-            $property = $reflection->getProperty('modelClass');
-            $property->setAccessible(true);
-            $modelClass = $property->getValue($validator);
-
-            return $modelClass ?: null;
-        } catch (\Exception $e) {
-            return null;
-        }
     }
 
     /**
