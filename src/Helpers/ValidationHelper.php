@@ -219,15 +219,31 @@ class ValidationHelper
     }
 
     /**
+     * Cache for reflected ENUM values to prevent repeated database queries
+     * Key format: "ModelClass::fieldName"
+     *
+     * @var array
+     */
+    protected static $enumCache = [];
+
+    /**
      * Validates that a value exists in a predefined list (enum/whitelist validation)
      *
-     * This validator provides enum validation for TypeRocket form fields.
-     * TypeRocket doesn't have a built-in 'in:' validator, so this callback fills that gap.
+     * This validator provides enum validation for TypeRocket form fields with three progressive modes:
      *
-     * Usage in validation rules:
-     * - 'field' => 'callback:checkInList:value1,value2,value3'
-     * - 'field' => 'required|callback:checkInList:draft,pending,approved'
-     * - 'field' => '?callback:checkInList:low,normal,high,urgent' (optional field)
+     * MODE 1 - Explicit list (backward compatible):
+     *   'field' => 'callback:checkInList:value1,value2,value3'
+     *   Validates against manually specified comma-separated values.
+     *
+     * MODE 2 - Explicit model reflection:
+     *   'field' => 'callback:checkInList:ModelName'
+     *   Reflects the model's ENUM column for this field name, extracts allowed values.
+     *   Example: 'approval_status' => 'callback:checkInList:ServicePrice'
+     *
+     * MODE 3 - Full auto-magic reflection:
+     *   'field' => 'callback:checkInList'
+     *   Automatically detects model from validation context and field name, reflects ENUM.
+     *   Zero configuration required - ENUM changes in migrations automatically apply.
      *
      * @param array $args Standard TypeRocket validator args array
      * @return bool|string True if valid, error message string if invalid
@@ -236,42 +252,79 @@ class ValidationHelper
     {
         /**
          * @var $option - The function name (checkInList)
-         * @var $option2 - First value in comma-separated list
-         * @var $option3 - Second value (and beyond are concatenated with commas)
-         * @var $field_name - Field name for error messages
+         * @var $option2 - Mode-dependent: comma-list, ModelName, or empty
+         * @var $option3 - Additional parameters (unused currently)
+         * @var $full_name - Raw field name (snake_case, actual database column name)
+         * @var $field_name - Formatted field label for error messages (Title Case with HTML)
          * @var $value - The value being validated
          * @var $weak - Whether this is an optional field
          * @var \TypeRocket\Utility\Validator $validator
          */
         extract($args);
 
-        // Handle optional/nullable fields
+        // Use raw field name as column name - database columns are snake_case
+        // TypeRocket passes both $full_name (raw: 'region_type') and $field_name (formatted: '<strong>"Region Type"</strong>')
+        $columnName = $full_name ?? $field_name;
+
+        // Handle optional fields with empty values
         if (isset($weak) && $weak && \TypeRocket\Utility\Data::emptyOrBlankRecursive($value)) {
             return true;
         }
 
-        // If no value provided and field is optional, it's valid
         if ($value === null || $value === '' || (is_string($value) && trim($value) === '')) {
             return true;
         }
 
-        // Build the allowed values array from $option2, $option3, etc.
-        // TypeRocket passes comma-separated values as: option2=value1, option3=value2, ...
+        // Determine mode and get allowed values
         $allowedValues = [];
+        $mode = null;
 
-        // Collect all option values (option2, option3, option4, etc.)
-        $optionIndex = 2;
-        while (isset($args["option{$optionIndex}"])) {
-            $allowedValues[] = $args["option{$optionIndex}"];
-            $optionIndex++;
+        if (isset($option2) && is_string($option2) && $option2 !== '') {
+            // Check if option2 contains comma (Mode 1) or is a class name (Mode 2)
+            if (strpos($option2, ',') !== false) {
+                // MODE 1: Explicit comma-separated list
+                $mode = 'explicit_list';
+                $allowedValues = array_map('trim', explode(',', $option2));
+            } else {
+                // MODE 2: Explicit model class name
+                $mode = 'explicit_model';
+                $modelClass = $option2;
+
+                // Resolve full class name if short name provided
+                if (strpos($modelClass, '\\') === false) {
+                    $modelClass = "MakerMaker\\Models\\{$modelClass}";
+                }
+
+                if (!class_exists($modelClass)) {
+                    return " validation error: Model class '{$option2}' not found";
+                }
+
+                // Use raw column name for database reflection
+                $allowedValues = self::getEnumValuesFromModel($modelClass, $columnName);
+            }
+        } else {
+            // MODE 3: Full auto-detection
+            $mode = 'auto';
+            $modelClass = self::detectModelContext($validator);
+
+            if (!$modelClass) {
+                return ' validation error: Unable to auto-detect model class. Use explicit mode.';
+            }
+
+            // Use raw column name for database reflection
+            $allowedValues = self::getEnumValuesFromModel($modelClass, $columnName);
         }
 
-        // If no allowed values found, validation fails
+        // Handle reflection errors
+        if (is_string($allowedValues)) {
+            // Error message returned from getEnumValuesFromModel
+            return $allowedValues;
+        }
+
         if (empty($allowedValues)) {
             return ' has no valid options defined';
         }
 
-        // Convert value to string for comparison
         $valueStr = (string) $value;
 
         // Check both strict and loose comparison to handle '1' vs 1 type mismatches
@@ -287,5 +340,122 @@ class ValidationHelper
         // Value not found in list - return error message
         $allowedList = implode(', ', $allowedValues);
         return " must be one of: {$allowedList}";
+    }
+
+    /**
+     * Detect model class from validation context
+     *
+     * Extracts the model class being validated from the TypeRocket validator instance.
+     *
+     * @param \TypeRocket\Utility\Validator $validator TypeRocket validator instance
+     * @return string|null Model class name or null if not found
+     */
+    protected static function detectModelContext($validator)
+    {
+        if (!$validator) {
+            return null;
+        }
+
+        // TypeRocket stores model class in protected $modelClass property
+        try {
+            $reflection = new \ReflectionClass($validator);
+            $property = $reflection->getProperty('modelClass');
+            $property->setAccessible(true);
+            $modelClass = $property->getValue($validator);
+
+            return $modelClass ?: null;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Get ENUM values from database schema by reflecting model
+     *
+     * Queries INFORMATION_SCHEMA to extract ENUM column definition and parse allowed values.
+     * Results are cached per model+field to prevent repeated database queries.
+     *
+     * @param string $modelClass Fully qualified model class name
+     * @param string $fieldName Database column name
+     * @return array|string Array of allowed values, or error message string on failure
+     */
+    protected static function getEnumValuesFromModel($modelClass, $fieldName)
+    {
+        // Check cache first
+        $cacheKey = "{$modelClass}::{$fieldName}";
+        if (isset(self::$enumCache[$cacheKey])) {
+            return self::$enumCache[$cacheKey];
+        }
+
+        try {
+            // Instantiate model to get table name
+            $model = new $modelClass();
+
+            if (!method_exists($model, 'getTable')) {
+                self::$enumCache[$cacheKey] = " validation error: Model does not support getTable()";
+                return self::$enumCache[$cacheKey];
+            }
+
+            $tableName = $model->getTable();
+
+            // Query INFORMATION_SCHEMA for column definition
+            global $wpdb;
+
+            $sql = $wpdb->prepare(
+                "SELECT COLUMN_TYPE
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = %s
+                  AND COLUMN_NAME = %s",
+                $tableName,
+                $fieldName
+            );
+
+            $columnType = $wpdb->get_var($sql);
+
+            if (!$columnType) {
+                self::$enumCache[$cacheKey] = " validation error: Column '{$fieldName}' not found in table '{$tableName}'";
+                return self::$enumCache[$cacheKey];
+            }
+
+            // Check if column is ENUM type
+            if (stripos($columnType, 'enum(') !== 0) {
+                self::$enumCache[$cacheKey] = " validation error: Column '{$fieldName}' is not an ENUM type (found: {$columnType})";
+                return self::$enumCache[$cacheKey];
+            }
+
+            // Parse ENUM values from definition: enum('value1','value2','value3')
+            // Remove "enum(" prefix and ")" suffix
+            $enumValues = substr($columnType, 5, -1);
+
+            // Split on comma and remove quotes
+            $values = array_map(function($value) {
+                return trim($value, "'\"");
+            }, explode(',', $enumValues));
+
+            // Cache and return
+            self::$enumCache[$cacheKey] = $values;
+            return $values;
+
+        } catch (\Exception $e) {
+            $errorMsg = " validation error: Failed to reflect ENUM values - " . $e->getMessage();
+            self::$enumCache[$cacheKey] = $errorMsg;
+            return $errorMsg;
+        }
+    }
+
+    /**
+     * Clear ENUM cache (useful for testing/debugging)
+     *
+     * @param string|null $cacheKey Specific cache key to clear, or null to clear all
+     * @return void
+     */
+    public static function clearEnumCache($cacheKey = null)
+    {
+        if ($cacheKey === null) {
+            self::$enumCache = [];
+        } elseif (isset(self::$enumCache[$cacheKey])) {
+            unset(self::$enumCache[$cacheKey]);
+        }
     }
 }
