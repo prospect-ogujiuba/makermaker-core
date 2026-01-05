@@ -1,6 +1,6 @@
 <?php
 
-namespace MakerMaker\Helpers;
+namespace MakermakerCore\Helpers;
 
 /**
  * HTML and UI generation utilities

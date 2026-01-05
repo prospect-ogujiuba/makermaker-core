@@ -1,6 +1,6 @@
 <?php
 
-namespace MakerMaker\Helpers;
+namespace MakermakerCore\Helpers;
 
 use TypeRocket\Models\Model;
 

@@ -1,8 +1,8 @@
 <?php
 
-namespace MakerMaker;
+namespace MakermakerCore;
 
-use MakerMaker\Providers\CoreServiceProvider;
+use MakermakerCore\Providers\CoreServiceProvider;
 
 class Boot
 {

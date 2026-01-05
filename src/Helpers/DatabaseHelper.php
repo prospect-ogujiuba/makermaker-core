@@ -1,6 +1,6 @@
 <?php
 
-namespace MakerMaker\Helpers;
+namespace MakermakerCore\Helpers;
 
 use TypeRocket\Http\Response;
 
@@ -86,8 +86,41 @@ class DatabaseHelper
     }
 
     /**
+     * Extract ENUM values from database table column
+     *
+     * @param string $table Table name (without prefix)
+     * @param string $column Column name
+     * @return array Associative array ['Display' => 'value']
+     */
+    public static function getEnumValues(string $table, string $column): array
+    {
+        global $wpdb;
+        $table_name = $wpdb->prefix . $table;
+
+        $result = $wpdb->get_row("SHOW COLUMNS FROM `{$table_name}` LIKE '{$column}'");
+
+        if (!$result) {
+            return [];
+        }
+
+        // Parse ENUM('value1','value2','value3') format
+        preg_match('/^enum\((.*)\)$/i', $result->Type, $matches);
+        $enum_values = [];
+
+        if (isset($matches[1])) {
+            $values = explode(',', $matches[1]);
+            foreach ($values as $value) {
+                $value = trim($value, "'");
+                $enum_values[ucwords(str_replace('_', ' ', $value))] = $value;
+            }
+        }
+
+        return $enum_values;
+    }
+
+    /**
      * Detect circular references in hierarchical data
-     * 
+     *
      * @param int $parentId The proposed parent ID
      * @param int $currentId The current record ID
      * @param string $tableName Database table name

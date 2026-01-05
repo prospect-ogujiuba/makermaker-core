@@ -1,6 +1,6 @@
 <?php
 
-namespace MakerMaker\Commands;
+namespace MakermakerCore\Commands;
 
 use TypeRocket\Console\Command;
 use TypeRocket\Utility\File;
@@ -569,8 +569,8 @@ class Crud extends Command
 			return MAKERMAKER_PLUGIN_DIR;
 		}
 		
-		if (class_exists('\MakerMaker\Boot')) {
-			$paths = \MakerMaker\Boot::getPaths();
+		if (class_exists('\MakermakerCore\Boot')) {
+			$paths = \MakermakerCore\Boot::getPaths();
 			if (!empty($paths['plugin_dir'])) {
 				return $paths['plugin_dir'];
 			}

@@ -1,6 +1,6 @@
 <?php
 
-namespace MakerMaker;
+namespace MakermakerCore;
 
 class ModuleDiscovery
 {

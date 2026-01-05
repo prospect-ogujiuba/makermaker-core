@@ -9,14 +9,14 @@
  * @package makermaker-core
  */
 
-use MakerMaker\Helpers\StringHelper;
-use MakerMaker\Helpers\HtmlHelper;
-use MakerMaker\Helpers\ValidationHelper;
-use MakerMaker\Helpers\DatabaseHelper;
-use MakerMaker\Helpers\DataTransformer;
-use MakerMaker\Helpers\EntityLookup;
-use MakerMaker\Helpers\ResourceHelper;
-use MakerMaker\Helpers\SmartResourceHelper;
+use MakermakerCore\Helpers\StringHelper;
+use MakermakerCore\Helpers\HtmlHelper;
+use MakermakerCore\Helpers\ValidationHelper;
+use MakermakerCore\Helpers\DatabaseHelper;
+use MakermakerCore\Helpers\DataTransformer;
+use MakermakerCore\Helpers\EntityLookup;
+use MakermakerCore\Helpers\ResourceHelper;
+use MakermakerCore\Helpers\SmartResourceHelper;
 use TypeRocket\Http\Request;
 
 /**

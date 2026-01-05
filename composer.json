@@ -14,7 +14,7 @@
   },
   "autoload": {
     "psr-4": {
-      "MakerMaker\\": "src/"
+      "MakermakerCore\\": "src/"
     },
     "files": [
       "src/helpers.php"
