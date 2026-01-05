@@ -21,7 +21,7 @@ class ReflectiveRestWrapper
 {
     private static $initialized = false;
     private static string $modelNamespace = '\\MakerMaker\\Models\\';
-    private static ?callable $listQueryModifier = null;
+    private static $listQueryModifier = null;
 
     /**
      * Set the model namespace for the plugin
