@@ -418,4 +418,59 @@ class ValidationHelper
             unset(self::$enumCache[$cacheKey]);
         }
     }
+
+    /**
+     * Validates that a field value does not equal another field in the same request
+     *
+     * Prevents self-referential records where two fields point to the same entity.
+     * Common use cases: preventing service from being addon to itself,
+     * preventing self-relationships in many-to-many junction tables.
+     *
+     * Usage: 'addon_service_id' => 'callback:checkNotSameAs:service_id:Service cannot be an addon to itself'
+     *
+     * @param array $args Standard TypeRocket validator args
+     * @return true|string Returns true if valid, error message if invalid
+     */
+    public static function checkNotSameAs(array $args)
+    {
+        /**
+         * @var $option - function name (checkNotSameAs)
+         * @var $option2 - field name to compare against (required)
+         * @var $option3 - custom error message (optional)
+         * @var $value - the value being validated
+         * @var $weak - whether this is an optional field
+         */
+        extract($args);
+
+        // $option2 = field name to compare against
+        // $option3 = custom error message (optional)
+        $compareField = $option2 ?? null;
+        $errorMessage = $option3 ?? ' cannot be the same as ' . $compareField;
+
+        if (!$compareField) {
+            return ' validation error: checkNotSameAs requires a field name parameter';
+        }
+
+        // Handle optional fields with empty values
+        if (isset($weak) && $weak && \TypeRocket\Utility\Data::emptyOrBlankRecursive($value)) {
+            return true;
+        }
+
+        // Get the other field's value from the request
+        $request = Request::new();
+        $fields = $request->getFields();
+        $compareValue = $fields[$compareField] ?? null;
+
+        // Allow if either value is empty
+        if ($value === null || $value === '' || $compareValue === null || $compareValue === '') {
+            return true;
+        }
+
+        // Compare as integers for ID fields
+        if ((int)$value === (int)$compareValue) {
+            return $errorMessage;
+        }
+
+        return true;
+    }
 }

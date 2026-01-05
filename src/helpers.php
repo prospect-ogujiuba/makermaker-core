@@ -102,6 +102,16 @@ function checkSelfReference($args)
 }
 
 /**
+ * Validates that a field value does not equal another field in the same request
+ *
+ * Usage in validation rules: 'field' => 'callback:checkNotSameAs:other_field:Custom error message'
+ */
+function checkNotSameAs($args)
+{
+    return ValidationHelper::checkNotSameAs($args);
+}
+
+/**
  * Validate currency is exactly 3 uppercase letters
  */
 function validateCurrency($value, $field_name)
