@@ -28,7 +28,7 @@ class AuthorizationHelper
         ?string $message = null
     ): void {
         if (!$model->can($action)) {
-            $entityName = class_basename($model);
+            $entityName = (new \ReflectionClass($model))->getShortName();
             $defaultMessage = sprintf('Unauthorized: %s not %s', $entityName, self::getPastTense($action));
             $response->unauthorized($message ?? $defaultMessage)->abort();
         }
