@@ -17,7 +17,15 @@ use MakermakerCore\Helpers\DataTransformer;
 use MakermakerCore\Helpers\EntityLookup;
 use MakermakerCore\Helpers\ResourceHelper;
 use MakermakerCore\Helpers\SmartResourceHelper;
+use MakermakerCore\Admin\ReflectiveFieldIntrospector;
+use MakermakerCore\Admin\FieldTypeDetector;
+use MakermakerCore\Admin\ReflectiveSearchColumns;
+use MakermakerCore\Admin\ReflectiveSearchFormFilters;
+use MakermakerCore\Admin\ReflectiveSearchModelFilter;
+use MakermakerCore\Admin\ReflectiveBulkActions;
+use MakermakerCore\Admin\ReflectiveTable;
 use TypeRocket\Http\Request;
+use TypeRocket\Models\Model;
 
 /**
  * ============================================================================
@@ -39,6 +47,30 @@ function outputSelectOptions($options, $currentValue, $valueKey = null, $labelKe
 function renderAdvancedSearchActions(string $resource): void
 {
     HtmlHelper::renderAdvancedSearchActions($resource);
+}
+
+/**
+ * Output select options from a related model
+ *
+ * @param string $modelClass Full class name of the model
+ * @param mixed $currentValue Currently selected value
+ * @param string $labelField Field to use as option label (default: 'name')
+ */
+function mm_model_select_options(string $modelClass, $currentValue, string $labelField = 'name'): void
+{
+    HtmlHelper::outputModelSelectOptions($modelClass, $currentValue, 'id', $labelField);
+}
+
+/**
+ * Output select options for a foreign key field with auto-detection
+ *
+ * @param Model $model The model containing the FK field
+ * @param string $fkField The foreign key field name (e.g., 'category_id')
+ * @param mixed $currentValue Currently selected value
+ */
+function mm_fk_select_options(Model $model, string $fkField, $currentValue): void
+{
+    HtmlHelper::outputForeignKeyOptions($model, $fkField, $currentValue);
 }
 
 /**
@@ -283,4 +315,177 @@ if (!function_exists('resource_url')) {
     {
         return SmartResourceHelper::url($resource, $action, $id);
     }
+}
+
+/**
+ * ============================================================================
+ * MODEL INTROSPECTION HELPERS
+ * ============================================================================
+ */
+
+/**
+ * Create a ReflectiveFieldIntrospector for a model
+ *
+ * Provides access to model properties ($fillable, $guard, $with, $cast, $format, $private)
+ * via reflection with per-class caching.
+ *
+ * @param Model $model The model instance to introspect
+ * @return ReflectiveFieldIntrospector
+ */
+function mm_introspect(Model $model): ReflectiveFieldIntrospector
+{
+    return new ReflectiveFieldIntrospector($model);
+}
+
+/**
+ * Detect the type of a model field
+ *
+ * Infers type from $cast, $format, and naming patterns.
+ * Returns one of the FieldTypeDetector::TYPE_* constants.
+ *
+ * @param Model $model The model instance
+ * @param string $field The field name
+ * @return string The detected type constant
+ */
+function mm_detect_field_type(Model $model, string $field): string
+{
+    $introspector = new ReflectiveFieldIntrospector($model);
+    $detector = new FieldTypeDetector($introspector);
+    return $detector->detectType($field);
+}
+
+/**
+ * Get auto-discovered search columns for a model
+ *
+ * Returns array in format expected by tr_table()->setSearchColumns().
+ * Auto-excludes non-searchable types (JSON, image).
+ *
+ * Usage:
+ *   $table->setSearchColumns(mm_search_columns(new Service()))
+ *
+ * For customization, use ReflectiveSearchColumns directly:
+ *   ReflectiveSearchColumns::for(new Service())->exclude(['metadata'])->getColumns()
+ *
+ * @param Model $model The model instance
+ * @return array<string, string> ['field_name' => 'Label']
+ */
+function mm_search_columns(Model $model): array
+{
+    return ReflectiveSearchColumns::for($model)->getColumns();
+}
+
+/**
+ * Get auto-generated search form filters for a model
+ *
+ * Returns a ReflectiveSearchFormFilters instance for fluent configuration.
+ * Use ->output() in addSearchFormFilter() callback.
+ *
+ * Usage:
+ *   $table->addSearchFormFilter(function() {
+ *       mm_search_form_filters(new Service(), 'service')->output();
+ *   });
+ *
+ * With customization:
+ *   $table->addSearchFormFilter(function() {
+ *       mm_search_form_filters(new Service(), 'service')
+ *           ->exclude(['metadata', 'long_desc'])
+ *           ->order(['name', 'category_id', 'is_active'])
+ *           ->output();
+ *   });
+ *
+ * @param Model $model The model instance
+ * @param string|null $resourceName Resource name for URLs (auto-derived if null)
+ * @return ReflectiveSearchFormFilters
+ */
+function mm_search_form_filters(Model $model, ?string $resourceName = null): ReflectiveSearchFormFilters
+{
+    return ReflectiveSearchFormFilters::for($model, $resourceName);
+}
+
+/**
+ * Get auto-applied model query filter for addSearchModelFilter()
+ *
+ * Returns a ReflectiveSearchModelFilter instance for fluent configuration.
+ * Use ->getCallback() to get the closure for addSearchModelFilter().
+ *
+ * Usage:
+ *   $table->addSearchModelFilter(mm_search_model_filter(new Service())->getCallback());
+ *
+ * With customization:
+ *   $table->addSearchModelFilter(
+ *       mm_search_model_filter(new Service())
+ *           ->exclude(['metadata'])
+ *           ->alias('category', 'category_id')
+ *           ->relationshipFilter('category_name', 'category', 'name', 'LIKE')
+ *           ->getCallback()
+ *   );
+ *
+ * @param Model $model The model instance
+ * @return ReflectiveSearchModelFilter
+ */
+function mm_search_model_filter(Model $model): ReflectiveSearchModelFilter
+{
+    return ReflectiveSearchModelFilter::for($model);
+}
+
+/**
+ * Get bulk actions for a model/controller
+ *
+ * Discovers bulk actions from #[BulkAction] attributed methods.
+ * Returns a ReflectiveBulkActions instance for fluent configuration.
+ *
+ * Usage:
+ *   [$form, $actions] = mm_bulk_actions(new Service())->getBulkActionsConfig();
+ *   $table->setBulkActions($form, $actions);
+ *
+ * With customization:
+ *   $table->setBulkActions(
+ *       ...mm_bulk_actions(new Service())
+ *           ->exclude(['archive'])
+ *           ->add('export', 'Export to CSV')
+ *           ->getBulkActionsConfig()
+ *   );
+ *
+ * @param object $target Model or Controller instance
+ * @return ReflectiveBulkActions
+ */
+function mm_bulk_actions(object $target): ReflectiveBulkActions
+{
+    return ReflectiveBulkActions::for($target);
+}
+
+/**
+ * Create a reflective table for a model
+ *
+ * Zero-config table that combines all reflective components:
+ * - Auto-discovered columns from model
+ * - Search columns for text search
+ * - Form filters for field filtering
+ * - Model filters for query application
+ * - Bulk actions from #[BulkAction] attributes
+ *
+ * Usage:
+ *   // Zero config - just works
+ *   mm_table(Service::class)->render();
+ *
+ *   // With customization
+ *   mm_table(Service::class)
+ *       ->excludeColumns(['metadata', 'long_desc'])
+ *       ->excludeFilters(['metadata'])
+ *       ->sortBy('name', 'ASC')
+ *       ->columnCallback('is_active', fn($v) => $v ? '✓' : '✗')
+ *       ->render();
+ *
+ *   // Disable specific features
+ *   mm_table(Service::class)
+ *       ->withoutBulkActions()
+ *       ->withoutFormFilters()
+ *       ->render();
+ *
+ * @param string $modelClass Full model class name
+ * @return ReflectiveTable
+ */
+function mm_table(string $modelClass): ReflectiveTable
+{
+    return ReflectiveTable::for($modelClass);
 }
