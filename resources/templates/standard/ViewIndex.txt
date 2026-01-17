@@ -1,45 +1,14 @@
 <?php
-
 /**
  * {{class}} Index View
+ *
+ * ReflectiveTable auto-discovers columns from model $fillable,
+ * bulk actions from HasDefaultBulkActions, and enables search/filters.
  */
-
 use {{app_namespace}}\Models\{{class}};
 
-$table = tr_table({{class}}::class);
-
-$table->setBulkActions(tr_form()->useConfirm(), []);
-
-$table->setColumns([
-    'id' => [
-        'label' => 'ID',
-        'sort' => true,
-        'actions' => ['edit', 'view', 'delete']
-    ],
-    'title' => [
-        'label' => 'Title',
-        'sort' => true,
-    ],
-    'description' => [
-        'label' => 'Description',
-        'sort' => true,
-    ],
-    'created_at' => [
-        'label' => 'Created At',
-        'sort' => true
-    ],
-    'updated_at' => [
-        'label' => 'Updated At',
-        'sort' => true
-    ],
-    'createdBy.display_name' => [
-        'label' => 'Created By',
-        'sort' => true
-    ],
-    'updatedBy.display_name' => [
-        'label' => 'Updated By',
-        'sort' => true
-    ]
-], 'id')->setOrder('id', 'DESC')->render();
-
-$table;
+mm_table({{class}}::class)
+    // ->excludeColumns(['internal_field'])  // Hide specific columns
+    // ->sortBy('created_at', 'DESC')        // Override default sort
+    // ->withoutBulkActions()                // Disable bulk actions
+    ->render();

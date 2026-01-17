@@ -4,9 +4,13 @@ namespace {{namespace}};
 
 use TypeRocket\Models\Model;
 use TypeRocket\Models\WPUser;
+use MakermakerCore\Admin\Traits\HasDefaultBulkActions;
 
 class {{class}} extends Model
 {
+    // Provides: bulkActivate, bulkDeactivate, bulkArchive, bulkRestore
+    use HasDefaultBulkActions;
+
     protected $resource = '{{table_name}}';
 
     protected $fillable = [

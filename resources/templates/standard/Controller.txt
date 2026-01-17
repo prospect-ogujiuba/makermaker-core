@@ -9,6 +9,17 @@ use TypeRocket\Controllers\Controller;
 use TypeRocket\Http\Response;
 use TypeRocket\Models\AuthUser;
 
+/**
+ * {{class}} Controller
+ *
+ * Admin UI endpoints for {{class}} management.
+ *
+ * REST API Architecture:
+ * - ReflectiveRestWrapper handles all REST routing automatically
+ * - Routes: GET/POST/PUT/DELETE /tr-api/rest/{{table_name}}/{id?}
+ * - Custom actions via #[Action] attributes on Model
+ * - Controller REST methods (below) are OPTIONAL overrides
+ */
 class {{class}}Controller extends Controller
 {
     /**
@@ -161,6 +172,12 @@ class {{class}}Controller extends Controller
 
         return $response->success('{{class}} deleted.')->setData('{{variable}}', ${{variable}});
     }
+
+    // ============================================
+    // REST API OVERRIDES (Optional)
+    // ============================================
+    // These methods override ReflectiveRestWrapper's default behavior.
+    // Remove if default behavior is sufficient.
 
     /**
      * The index function for API

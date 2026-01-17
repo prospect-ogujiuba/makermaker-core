@@ -9,6 +9,12 @@ use TypeRocket\Controllers\Controller;
 use TypeRocket\Http\Response;
 use TypeRocket\Models\AuthUser;
 
+/**
+ * {{class}} Controller
+ *
+ * Admin UI endpoints only. REST API is handled automatically by
+ * ReflectiveRestWrapper - see Model for #[Action] custom endpoints.
+ */
 class {{class}}Controller extends Controller
 {
     /**

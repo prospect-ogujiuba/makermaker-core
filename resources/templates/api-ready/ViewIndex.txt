@@ -1,45 +1,35 @@
 <?php
-
 /**
- * {{class}} Index View
+ * {{class}} Index View - API Ready
+ *
+ * ReflectiveTable provides:
+ * - Auto-discovered columns from model $fillable
+ * - Bulk actions from HasDefaultBulkActions trait + #[BulkAction] methods
+ * - Search across searchable fields
+ * - Form filters for filtering data
+ * - Auto-formatting for dates, booleans, foreign keys
  */
-
 use {{app_namespace}}\Models\{{class}};
+use MakermakerCore\Admin\ReflectiveTable;
 
-$table = tr_table({{class}}::class);
+// Zero-config version:
+// mm_table({{class}}::class)->render();
 
-$table->setBulkActions(tr_form()->useConfirm(), []);
+// Customized version:
+ReflectiveTable::for({{class}}::class)
+    // Column control
+    // ->excludeColumns(['metadata', 'internal_notes'])
+    // ->columns(['id', 'title', 'status', 'created_at'])  // Explicit columns
 
-$table->setColumns([
-    'id' => [
-        'label' => 'ID',
-        'sort' => true,
-        'actions' => ['edit', 'view', 'delete']
-    ],
-    'title' => [
-        'label' => 'Title',
-        'sort' => true,
-    ],
-    'description' => [
-        'label' => 'Description',
-        'sort' => true,
-    ],
-    'created_at' => [
-        'label' => 'Created At',
-        'sort' => true
-    ],
-    'updated_at' => [
-        'label' => 'Updated At',
-        'sort' => true
-    ],
-    'createdBy.display_name' => [
-        'label' => 'Created By',
-        'sort' => true
-    ],
-    'updatedBy.display_name' => [
-        'label' => 'Updated By',
-        'sort' => true
-    ]
-], 'id')->setOrder('id', 'DESC')->render();
+    // Sorting
+    // ->sortBy('created_at', 'DESC')
 
-$table;
+    // Custom column rendering
+    // ->columnCallback('status', fn($val) => "<span class='badge badge-{$val}'>{$val}</span>")
+
+    // Feature toggles
+    // ->withoutBulkActions()
+    // ->withoutSearchColumns()
+    // ->withoutFormFilters()
+
+    ->render();

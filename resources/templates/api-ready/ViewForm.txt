@@ -4,6 +4,10 @@
  * {{class}} Form - API Ready
  */
 
+use MakermakerCore\Helpers\HtmlHelper;
+use function mm_fk_select_options;
+use function mm_model_select_options;
+
 // Form instance
 echo $form->open();
 
@@ -40,6 +44,59 @@ $tabs->tab('Overview', 'admin-settings', [
         ]
     )
 ])->setDescription('{{title_class}}');
+
+// -------------------------------------------------------------------------
+// Relationships Tab - Foreign Key & Model Select Examples
+// -------------------------------------------------------------------------
+// Uncomment and customize for your model's relationships
+
+// $tabs->tab('Relationships', 'diagram-2', [
+//     $form->fieldset(
+//         'Related Records',
+//         'Link to other resources',
+//         [
+//             // FK Select - Auto-detects label field (name, title, code)
+//             $form->row()
+//                 ->withColumn(
+//                     $form->select('category_id')
+//                         ->setLabel('Category')
+//                         ->setOptions(function() use ($form) {
+//                             echo '<option value="">Select Category...</option>';
+//                             mm_fk_select_options($form->getModel(), 'category_id', $form->getModel()->category_id ?? null);
+//                         })
+//                         ->markLabelRequired()
+//                 )
+//                 ->withColumn(
+//                     $form->select('owner_id')
+//                         ->setLabel('Owner')
+//                         ->setOptions(function() use ($form) {
+//                             echo '<option value="">Select Owner...</option>';
+//                             // Direct model select with custom label field
+//                             mm_model_select_options(\App\Models\User::class, $form->getModel()->owner_id ?? null, 'display_name');
+//                         })
+//                 ),
+//
+//             // Advanced: Model select with query modifier
+//             $form->row()
+//                 ->withColumn(
+//                     $form->select('assigned_to')
+//                         ->setLabel('Assigned To')
+//                         ->setOptions(function() use ($form) {
+//                             echo '<option value="">Unassigned</option>';
+//                             HtmlHelper::outputModelSelectOptions(
+//                                 \App\Models\User::class,
+//                                 $form->getModel()->assigned_to ?? null,
+//                                 'id',
+//                                 'display_name',
+//                                 'display_name',
+//                                 'ASC',
+//                                 fn($q) => $q->where('role', 'IN', ['admin', 'editor'])
+//                             );
+//                         })
+//                 )
+//         ]
+//     )
+// ])->setDescription('Linked resources');
 
 // Conditional System Info Tab
 if (isset($current_id)) {

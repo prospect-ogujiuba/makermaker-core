@@ -5,6 +5,15 @@ namespace {{namespace}};
 use TypeRocket\Models\AuthUser;
 use TypeRocket\Auth\Policy;
 
+/**
+ * {{class}} Policy
+ *
+ * Authorizes CRUD operations.
+ * ReflectiveBulkActions uses policy capabilities:
+ * - bulkActivate/bulkDeactivate: 'edit' capability
+ * - bulkArchive: 'delete' capability
+ * - bulkRestore: 'edit' capability
+ */
 class {{class}} extends Policy
 {
     public function create(AuthUser $auth, $object)

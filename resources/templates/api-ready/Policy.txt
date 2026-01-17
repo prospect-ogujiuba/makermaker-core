@@ -5,6 +5,16 @@ namespace {{namespace}};
 use TypeRocket\Models\AuthUser;
 use TypeRocket\Auth\Policy;
 
+/**
+ * {{class}} Policy
+ *
+ * Authorizes CRUD operations and custom actions.
+ * Used by:
+ * - Admin UI (create, read, update, destroy)
+ * - ReflectiveRestWrapper (all operations)
+ * - ReflectiveBulkActions (uses 'edit' or custom capability per action)
+ * - Model #[Action] methods (uses action's capability setting)
+ */
 class {{class}} extends Policy
 {
     public function create(AuthUser $auth, $object)
@@ -25,5 +35,23 @@ class {{class}} extends Policy
     public function destroy(AuthUser $auth, $object)
     {
         return $auth->isCapable('manage_{{capability}}');
+    }
+
+    /**
+     * Authorize custom REST actions
+     *
+     * Called by ReflectiveRestWrapper for #[Action] methods.
+     * Override per-action authorization in Model if needed.
+     *
+     * @param AuthUser $auth Current user
+     * @param mixed $object The model instance
+     * @param string $action The action name being called
+     * @return bool
+     */
+    public function action(AuthUser $auth, $object, string $action = '')
+    {
+        // Default: same as read permission
+        // Override for action-specific authorization
+        return $this->read($auth, $object);
     }
 }

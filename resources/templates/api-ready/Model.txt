@@ -4,9 +4,15 @@ namespace {{namespace}};
 
 use TypeRocket\Models\Model;
 use TypeRocket\Models\WPUser;
+use MakermakerCore\Admin\Traits\HasDefaultBulkActions;
+use MakermakerCore\Attributes\Action;
+use MakermakerCore\Attributes\BulkAction;
 
 class {{class}} extends Model
 {
+    // Provides: bulkActivate, bulkDeactivate, bulkArchive, bulkRestore
+    use HasDefaultBulkActions;
+
     protected $resource = '{{table_name}}';
 
     protected $fillable = [
@@ -23,6 +29,33 @@ class {{class}} extends Model
         'created_by',
         'updated_by'
     ];
+
+    // -------------------------------------------------------------------------
+    // REST Actions - Exposed via POST /tr-api/rest/{{table_name}}/{id}/actions/{action}
+    // -------------------------------------------------------------------------
+
+    // Example: Custom REST action
+    // #[Action(capability: 'create', description: 'Duplicate this {{class}}')]
+    // public function duplicate(\MakermakerCore\Auth\AuthUser $user, array $params): array
+    // {
+    //     $copy = (new static())->create([
+    //         'title' => $this->title . ' (Copy)',
+    //         'description' => $this->description,
+    //     ]);
+    //     return ['success' => true, 'data' => $copy];
+    // }
+
+    // -------------------------------------------------------------------------
+    // Custom Bulk Actions - Add to those provided by HasDefaultBulkActions
+    // -------------------------------------------------------------------------
+
+    // Example: Custom bulk action
+    // #[BulkAction(label: 'Mark Featured', capability: 'edit', icon: 'star')]
+    // public function bulkMarkFeatured(array $ids): array
+    // {
+    //     $updated = (new static())->findAll()->where('id', 'IN', $ids)->update(['is_featured' => 1]);
+    //     return ['success' => true, 'message' => "Marked {$updated} items as featured"];
+    // }
 
     /** Created by WP user */
     public function createdBy()

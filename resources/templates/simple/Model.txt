@@ -4,9 +4,12 @@ namespace {{namespace}};
 
 use TypeRocket\Models\Model;
 use TypeRocket\Models\WPUser;
+use MakermakerCore\Admin\Traits\HasDefaultBulkActions;
 
 class {{class}} extends Model
 {
+    use HasDefaultBulkActions;
+
     protected $resource = '{{table_name}}';
 
     protected $fillable = [

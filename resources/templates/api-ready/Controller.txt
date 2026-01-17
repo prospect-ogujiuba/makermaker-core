@@ -9,6 +9,38 @@ use TypeRocket\Controllers\Controller;
 use TypeRocket\Http\Response;
 use TypeRocket\Models\AuthUser;
 
+/**
+ * {{class}} Controller - API Ready
+ *
+ * Admin UI endpoints + optional REST overrides.
+ *
+ * REST API Architecture:
+ * ----------------------
+ * ReflectiveRestWrapper handles REST routing automatically:
+ *
+ * | Method | Route                                    | Handler               |
+ * |--------|------------------------------------------|-----------------------|
+ * | GET    | /tr-api/rest/{{table_name}}              | List all              |
+ * | GET    | /tr-api/rest/{{table_name}}/{id}         | Show one              |
+ * | POST   | /tr-api/rest/{{table_name}}              | Create                |
+ * | PUT    | /tr-api/rest/{{table_name}}/{id}         | Update                |
+ * | DELETE | /tr-api/rest/{{table_name}}/{id}         | Delete                |
+ * | POST   | /tr-api/rest/{{table_name}}/{id}/actions/{action} | Custom action |
+ *
+ * Custom Actions:
+ * Define #[Action] methods on your Model class - they're auto-discovered.
+ *
+ * Controller REST Overrides:
+ * The REST methods below (indexRest, showRest, etc.) are OPTIONAL.
+ * They override ReflectiveRestWrapper's default behavior.
+ * Use them when you need:
+ * - Custom pagination logic
+ * - Complex authorization beyond Policy
+ * - Response transformation
+ * - Eager loading specific to REST context
+ *
+ * If default behavior is sufficient, you can DELETE these methods.
+ */
 class {{class}}Controller extends Controller
 {
     /**
@@ -163,7 +195,20 @@ class {{class}}Controller extends Controller
     }
 
     // ============================================
-    // REST API ENDPOINTS
+    // REST API OVERRIDES (Optional)
+    // ============================================
+    // These methods override ReflectiveRestWrapper's default behavior.
+    // Default behavior: ReflectiveRestWrapper calls Model methods directly.
+    //
+    // When to keep these overrides:
+    // - Custom pagination (e.g., cursor-based)
+    // - Complex eager loading for REST responses
+    // - Response transformation (e.g., API versioning)
+    // - Additional authorization logic
+    //
+    // When to delete these:
+    // - Default CRUD behavior is sufficient
+    // - Custom logic lives in Model #[Action] methods
     // ============================================
 
     /**

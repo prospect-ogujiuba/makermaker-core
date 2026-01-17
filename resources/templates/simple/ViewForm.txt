@@ -36,7 +36,14 @@ $tabs->tab('Overview', 'admin-settings', [
                         ->setHelp('Detailed description of {{title_class}}')
                         ->setAttribute('placeholder', 'e.g., This is a description')
                         ->setAttribute('maxlength', '255')
-                )
+                ),
+
+            // FK relationship example (uncomment and adjust field name):
+            // $form->select('category_id')
+            //     ->setLabel('Category')
+            //     ->setOptions(function() use ($form) {
+            //         mm_fk_select_options($form->getModel(), 'category_id', $form->getModel()->category_id ?? null);
+            //     })
         ]
     )
 ])->setDescription('{{title_class}}');

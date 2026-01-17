@@ -41,6 +41,27 @@ $tabs->tab('Overview', 'admin-settings', [
     )
 ])->setDescription('{{title_class}}');
 
+// -------------------------------------------------------------------------
+// Relationship Fields Example
+// -------------------------------------------------------------------------
+// For foreign key relationships, use mm_fk_select_options() which
+// auto-detects the label field (name, title, code, description)
+//
+// $form->row()
+//     ->withColumn(
+//         $form->select('category_id')
+//             ->setLabel('Category')
+//             ->setOptions(function() use ($form) {
+//                 mm_fk_select_options($form->getModel(), 'category_id', $form->getModel()->category_id ?? null);
+//             })
+//             ->markLabelRequired()
+//     )
+//     ->withColumn(
+//         $form->select('status')
+//             ->setLabel('Status')
+//             ->setOptions(['draft' => 'Draft', 'published' => 'Published', 'archived' => 'Archived'])
+//     )
+
 // Conditional System Info Tab
 if (isset($current_id)) {
     // System Info Tab
