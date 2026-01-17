@@ -53,9 +53,9 @@ class StringHelper
             // Already has separators, just return ucwords
             return ucwords(str_replace('_', ' ', $string));
         }
-        
+
         $result = preg_replace('/(?<!^)([A-Z])/', ' $1', $string);
-        return trim($result);
+        return ucwords(trim($result));
     }
 
     /**
