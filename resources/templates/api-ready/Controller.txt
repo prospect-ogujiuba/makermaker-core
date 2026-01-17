@@ -5,6 +5,11 @@ namespace {{namespace}};
 use {{app_namespace}}\Http\Fields\{{class}}Fields;
 use {{app_namespace}}\Models\{{class}};
 use {{app_namespace}}\View;
+use MakermakerCore\Helpers\AuthorizationHelper;
+use MakermakerCore\Helpers\AuditTrailHelper;
+use MakermakerCore\Helpers\DeleteHelper;
+use MakermakerCore\Helpers\RestHelper;
+use MakermakerCore\Helpers\RestIndexHelper;
 use TypeRocket\Controllers\Controller;
 use TypeRocket\Http\Response;
 use TypeRocket\Models\AuthUser;
@@ -12,73 +17,38 @@ use TypeRocket\Models\AuthUser;
 /**
  * {{class}} Controller - API Ready
  *
- * Admin UI endpoints + optional REST overrides.
+ * Admin UI endpoints + REST overrides for custom behavior.
  *
- * REST API Architecture:
- * ----------------------
- * ReflectiveRestWrapper handles REST routing automatically:
+ * REST API Routes (auto via ReflectiveRestWrapper):
+ * | Method | Route                                    | Handler       |
+ * |--------|------------------------------------------|---------------|
+ * | GET    | /tr-api/rest/{{table_name}}              | List all      |
+ * | GET    | /tr-api/rest/{{table_name}}/{id}         | Show one      |
+ * | POST   | /tr-api/rest/{{table_name}}              | Create        |
+ * | PUT    | /tr-api/rest/{{table_name}}/{id}         | Update        |
+ * | DELETE | /tr-api/rest/{{table_name}}/{id}         | Delete        |
+ * | POST   | /tr-api/rest/{{table_name}}/{id}/actions/{action} | Custom |
  *
- * | Method | Route                                    | Handler               |
- * |--------|------------------------------------------|-----------------------|
- * | GET    | /tr-api/rest/{{table_name}}              | List all              |
- * | GET    | /tr-api/rest/{{table_name}}/{id}         | Show one              |
- * | POST   | /tr-api/rest/{{table_name}}              | Create                |
- * | PUT    | /tr-api/rest/{{table_name}}/{id}         | Update                |
- * | DELETE | /tr-api/rest/{{table_name}}/{id}         | Delete                |
- * | POST   | /tr-api/rest/{{table_name}}/{id}/actions/{action} | Custom action |
- *
- * Custom Actions:
- * Define #[Action] methods on your Model class - they're auto-discovered.
- *
- * Controller REST Overrides:
- * The REST methods below (indexRest, showRest, etc.) are OPTIONAL.
- * They override ReflectiveRestWrapper's default behavior.
- * Use them when you need:
- * - Custom pagination logic
- * - Complex authorization beyond Policy
- * - Response transformation
- * - Eager loading specific to REST context
- *
- * If default behavior is sufficient, you can DELETE these methods.
+ * Define #[Action] methods on Model for custom endpoints.
+ * Controller REST methods below are OPTIONAL overrides.
  */
 class {{class}}Controller extends Controller
 {
-    /**
-     * The index page for admin
-     *
-     * @return mixed
-     */
     public function index()
     {
         return View::new('{{view_path}}.index');
     }
 
-    /**
-     * The add page for admin
-     *
-     * @return mixed
-     */
     public function add(AuthUser $user)
     {
         $form = tr_form({{class}}::class)->useErrors()->useOld()->useConfirm();
         return View::new('{{view_path}}.form', compact('form', 'user'));
     }
 
-    /**
-     * Create item
-     *
-     * AJAX requests and normal requests can be made to this action
-     *
-     * @return mixed
-     */
     public function create({{class}}Fields $fields, {{class}} ${{variable}}, Response $response, AuthUser $user)
     {
-        if (!${{variable}}->can('create')) {
-            $response->unauthorized('Unauthorized: {{class}} not created')->abort();
-        }
-
-        ${{variable}}->created_by = $user->ID;
-        ${{variable}}->updated_by = $user->ID;
+        AuthorizationHelper::authorize(${{variable}}, 'create', $response);
+        AuditTrailHelper::setCreateAuditFields(${{variable}}, $user);
 
         $success = tryDatabaseOperation(
             fn() => ${{variable}}->save($fields),
@@ -89,19 +59,10 @@ class {{class}}Controller extends Controller
 
         if ($success) {
             return tr_redirect()->toPage('{{route_name}}', 'index')->withFlash('{{class}} created');
-        } else {
-            return tr_redirect()->back()
-                ->withErrors($response->getErrors());
         }
+        return tr_redirect()->back()->withErrors($response->getErrors());
     }
 
-    /**
-     * The edit page for admin
-     *
-     * @param {{class}} ${{variable}}
-     *
-     * @return mixed
-     */
     public function edit({{class}} ${{variable}}, AuthUser $user)
     {
         $current_id = ${{variable}}->getID();
@@ -112,22 +73,10 @@ class {{class}}Controller extends Controller
         return View::new('{{view_path}}.form', compact('form', 'current_id', 'createdBy', 'updatedBy', 'user'));
     }
 
-    /**
-     * Update item
-     *
-     * AJAX requests and normal requests can be made to this action
-     *
-     * @param {{class}} ${{variable}}
-     *
-     * @return mixed
-     */
     public function update({{class}} ${{variable}}, {{class}}Fields $fields, Response $response, AuthUser $user)
     {
-        if (!${{variable}}->can('update')) {
-            $response->unauthorized('Unauthorized: {{class}} not updated')->abort();
-        }
-
-        ${{variable}}->updated_by = $user->ID;
+        AuthorizationHelper::authorize(${{variable}}, 'update', $response);
+        AuditTrailHelper::setUpdateAuditFields(${{variable}}, $user);
 
         $success = tryDatabaseOperation(
             fn() => ${{variable}}->save($fields),
@@ -138,251 +87,72 @@ class {{class}}Controller extends Controller
 
         if ($success) {
             return tr_redirect()->toPage('{{route_name}}', 'edit', ${{variable}}->getID())->withFlash('{{class}} updated');
-        } else {
-            return tr_redirect()->back()
-                ->withErrors($response->getErrors());
         }
+        return tr_redirect()->back()->withErrors($response->getErrors());
     }
 
-    /**
-     * The show page for admin
-     *
-     * @param {{class}} ${{variable}}
-     *
-     * @return mixed
-     */
     public function show({{class}} ${{variable}})
     {
         return ${{variable}};
     }
 
-    /**
-     * The delete page for admin
-     *
-     * @param {{class}} ${{variable}}
-     *
-     * @return mixed
-     */
     public function delete({{class}} ${{variable}})
     {
         //
     }
 
-    /**
-     * Destroy item
-     *
-     * AJAX requests and normal requests can be made to this action
-     *
-     * @param {{class}} ${{variable}}
-     *
-     * @return mixed
-     */
     public function destroy({{class}} ${{variable}}, Response $response)
     {
-        if (!${{variable}}->can('destroy')) {
-            return $response->unauthorized('Unauthorized: {{class}} not deleted');
-        }
-
-        $deleted = ${{variable}}->delete();
-
-        if ($deleted === false) {
-            return $response
-                ->error('Delete failed due to a database error.')
-                ->setStatus(500);
-        }
-
-        return $response->success('{{class}} deleted.')->setData('{{variable}}', ${{variable}});
+        AuthorizationHelper::authorize(${{variable}}, 'destroy', $response);
+        return DeleteHelper::executeDelete(${{variable}}, $response);
     }
 
     // ============================================
     // REST API OVERRIDES (Optional)
     // ============================================
-    // These methods override ReflectiveRestWrapper's default behavior.
-    // Default behavior: ReflectiveRestWrapper calls Model methods directly.
-    //
-    // When to keep these overrides:
-    // - Custom pagination (e.g., cursor-based)
-    // - Complex eager loading for REST responses
-    // - Response transformation (e.g., API versioning)
-    // - Additional authorization logic
-    //
-    // When to delete these:
-    // - Default CRUD behavior is sufficient
-    // - Custom logic lives in Model #[Action] methods
-    // ============================================
+    // Remove these if default ReflectiveRestWrapper behavior is sufficient.
 
-    /**
-     * List all items (REST)
-     *
-     * @return \TypeRocket\Http\Response
-     */
     public function indexRest(Response $response)
     {
-        try {
-            ${{plural_variable}} = {{class}}::new()->get();
-
-            if (empty(${{plural_variable}})) {
-                return $response
-                    ->setData('{{plural_variable}}', [])
-                    ->setMessage('No {{class}} found', 'info')
-                    ->setStatus(200);
-            }
-
-            return $response
-                ->setData('{{plural_variable}}', ${{plural_variable}})
-                ->setMessage('{{class}} retrieved successfully', 'success')
-                ->setStatus(200);
-        } catch (\Exception $e) {
-            error_log('{{class}} indexRest error: ' . $e->getMessage());
-
-            return $response
-                ->error('Failed to retrieve {{class}}: ' . $e->getMessage())
-                ->setStatus(500);
-        }
+        return RestIndexHelper::handleIndex($response, {{class}}::class, '{{plural_variable}}');
     }
 
-    /**
-     * Show single item (REST)
-     *
-     * @param {{class}} ${{variable}}
-     * @param Response $response
-     *
-     * @return \TypeRocket\Http\Response
-     */
     public function showRest({{class}} ${{variable}}, Response $response)
     {
-        try {
-            ${{variable}} = {{class}}::new()->find(${{variable}}->getID());
-
-            if (empty(${{variable}})) {
-                return $response
-                    ->setData('{{variable}}', null)
-                    ->setMessage('{{class}} not found', 'info')
-                    ->setStatus(404);
-            }
-
-            return $response
-                ->setData('{{variable}}', ${{variable}})
-                ->setMessage('{{class}} retrieved successfully', 'success')
-                ->setStatus(200);
-        } catch (\Exception $e) {
-            error_log('{{class}} showRest error: ' . $e->getMessage());
-            return $response
-                ->setMessage('An error occurred while retrieving {{class}}', 'error')
-                ->setStatus(500);
-        }
+        return RestIndexHelper::handleShow($response, ${{variable}}, {{class}}::class, '{{variable}}');
     }
 
-    /**
-     * Create item (REST)
-     *
-     * @param {{class}}Fields $fields
-     * @param {{class}} ${{variable}}
-     * @param Response $response
-     * @param AuthUser $user
-     *
-     * @return \TypeRocket\Http\Response
-     */
     public function createRest({{class}}Fields $fields, {{class}} ${{variable}}, Response $response, AuthUser $user)
     {
-        try {
-            if (!${{variable}}->can('create')) {
-                return $response->unauthorized('Unauthorized: {{class}} not created');
-            }
+        AuthorizationHelper::authorize(${{variable}}, 'create', $response);
+        AuditTrailHelper::setCreateAuditFields(${{variable}}, $user);
 
-            ${{variable}}->created_by = $user->ID;
-            ${{variable}}->updated_by = $user->ID;
+        $saved = ${{variable}}->save($fields);
 
-            $saved = ${{variable}}->save($fields);
-
-            if (!$saved) {
-                return $response
-                    ->error('Failed to create {{class}}')
-                    ->setStatus(500);
-            }
-
-            return $response
-                ->setData('{{variable}}', ${{variable}})
-                ->setMessage('{{class}} created successfully', 'success')
-                ->setStatus(201);
-        } catch (\Exception $e) {
-            error_log('{{class}} createRest error: ' . $e->getMessage());
-            return $response
-                ->error('Failed to create {{class}}: ' . $e->getMessage())
-                ->setStatus(500);
+        if (!$saved) {
+            return RestHelper::errorResponse($response, [], 'Failed to create {{class}}', 500);
         }
+
+        return RestHelper::successResponse($response, ['{{variable}}' => ${{variable}}], '{{class}} created successfully', 201);
     }
 
-    /**
-     * Update item (REST)
-     *
-     * @param {{class}} ${{variable}}
-     * @param {{class}}Fields $fields
-     * @param Response $response
-     * @param AuthUser $user
-     *
-     * @return \TypeRocket\Http\Response
-     */
     public function updateRest({{class}} ${{variable}}, {{class}}Fields $fields, Response $response, AuthUser $user)
     {
-        try {
-            if (!${{variable}}->can('update')) {
-                return $response->unauthorized('Unauthorized: {{class}} not updated');
-            }
+        AuthorizationHelper::authorize(${{variable}}, 'update', $response);
+        AuditTrailHelper::setUpdateAuditFields(${{variable}}, $user);
 
-            ${{variable}}->updated_by = $user->ID;
+        $saved = ${{variable}}->save($fields);
 
-            $saved = ${{variable}}->save($fields);
-
-            if (!$saved) {
-                return $response
-                    ->error('Failed to update {{class}}')
-                    ->setStatus(500);
-            }
-
-            return $response
-                ->setData('{{variable}}', ${{variable}})
-                ->setMessage('{{class}} updated successfully', 'success')
-                ->setStatus(200);
-        } catch (\Exception $e) {
-            error_log('{{class}} updateRest error: ' . $e->getMessage());
-            return $response
-                ->error('Failed to update {{class}}: ' . $e->getMessage())
-                ->setStatus(500);
+        if (!$saved) {
+            return RestHelper::errorResponse($response, [], 'Failed to update {{class}}', 500);
         }
+
+        return RestHelper::successResponse($response, ['{{variable}}' => ${{variable}}], '{{class}} updated successfully', 200);
     }
 
-    /**
-     * Delete item (REST)
-     *
-     * @param {{class}} ${{variable}}
-     * @param Response $response
-     *
-     * @return \TypeRocket\Http\Response
-     */
     public function destroyRest({{class}} ${{variable}}, Response $response)
     {
-        try {
-            if (!${{variable}}->can('destroy')) {
-                return $response->unauthorized('Unauthorized: {{class}} not deleted');
-            }
-
-            $deleted = ${{variable}}->delete();
-
-            if ($deleted === false) {
-                return $response
-                    ->error('Delete failed due to a database error.')
-                    ->setStatus(500);
-            }
-
-            return $response
-                ->setMessage('{{class}} deleted successfully', 'success')
-                ->setStatus(200);
-        } catch (\Exception $e) {
-            error_log('{{class}} destroyRest error: ' . $e->getMessage());
-            return $response
-                ->error('Failed to delete {{class}}: ' . $e->getMessage())
-                ->setStatus(500);
-        }
+        AuthorizationHelper::authorize(${{variable}}, 'destroy', $response);
+        return DeleteHelper::executeDelete(${{variable}}, $response);
     }
 }

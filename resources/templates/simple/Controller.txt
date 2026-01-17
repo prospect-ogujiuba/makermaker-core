@@ -5,6 +5,9 @@ namespace {{namespace}};
 use {{app_namespace}}\Http\Fields\{{class}}Fields;
 use {{app_namespace}}\Models\{{class}};
 use {{app_namespace}}\View;
+use MakermakerCore\Helpers\AuthorizationHelper;
+use MakermakerCore\Helpers\AuditTrailHelper;
+use MakermakerCore\Helpers\DeleteHelper;
 use TypeRocket\Controllers\Controller;
 use TypeRocket\Http\Response;
 use TypeRocket\Models\AuthUser;
@@ -12,39 +15,25 @@ use TypeRocket\Models\AuthUser;
 /**
  * {{class}} Controller
  *
- * Admin UI endpoints only. REST API is handled automatically by
- * ReflectiveRestWrapper - see Model for #[Action] custom endpoints.
+ * Admin UI endpoints only. REST API handled by ReflectiveRestWrapper.
  */
 class {{class}}Controller extends Controller
 {
-    /**
-     * Index page
-     */
     public function index()
     {
         return View::new('{{view_path}}.index');
     }
 
-    /**
-     * Add page
-     */
     public function add(AuthUser $user)
     {
         $form = tr_form({{class}}::class)->useErrors()->useOld()->useConfirm();
         return View::new('{{view_path}}.form', compact('form', 'user'));
     }
 
-    /**
-     * Create item
-     */
     public function create({{class}}Fields $fields, {{class}} ${{variable}}, Response $response, AuthUser $user)
     {
-        if (!${{variable}}->can('create')) {
-            $response->unauthorized('Unauthorized: {{class}} not created')->abort();
-        }
-
-        ${{variable}}->created_by = $user->ID;
-        ${{variable}}->updated_by = $user->ID;
+        AuthorizationHelper::authorize(${{variable}}, 'create', $response);
+        AuditTrailHelper::setCreateAuditFields(${{variable}}, $user);
 
         $success = tryDatabaseOperation(
             fn() => ${{variable}}->save($fields),
@@ -55,30 +44,20 @@ class {{class}}Controller extends Controller
 
         if ($success) {
             return tr_redirect()->toPage('{{route_name}}', 'index')->withFlash('{{class}} created');
-        } else {
-            return tr_redirect()->back()->withErrors($response->getErrors());
         }
+        return tr_redirect()->back()->withErrors($response->getErrors());
     }
 
-    /**
-     * Edit page
-     */
     public function edit({{class}} ${{variable}}, AuthUser $user)
     {
         $form = tr_form(${{variable}})->useErrors()->useOld()->useConfirm();
         return View::new('{{view_path}}.form', compact('form', 'user'));
     }
 
-    /**
-     * Update item
-     */
     public function update({{class}} ${{variable}}, {{class}}Fields $fields, Response $response, AuthUser $user)
     {
-        if (!${{variable}}->can('update')) {
-            $response->unauthorized('Unauthorized: {{class}} not updated')->abort();
-        }
-
-        ${{variable}}->updated_by = $user->ID;
+        AuthorizationHelper::authorize(${{variable}}, 'update', $response);
+        AuditTrailHelper::setUpdateAuditFields(${{variable}}, $user);
 
         $success = tryDatabaseOperation(
             fn() => ${{variable}}->save($fields),
@@ -89,26 +68,13 @@ class {{class}}Controller extends Controller
 
         if ($success) {
             return tr_redirect()->toPage('{{route_name}}', 'edit', ${{variable}}->getID())->withFlash('{{class}} updated');
-        } else {
-            return tr_redirect()->back()->withErrors($response->getErrors());
         }
+        return tr_redirect()->back()->withErrors($response->getErrors());
     }
 
-    /**
-     * Delete item
-     */
     public function destroy({{class}} ${{variable}}, Response $response)
     {
-        if (!${{variable}}->can('destroy')) {
-            return $response->unauthorized('Unauthorized: {{class}} not deleted');
-        }
-
-        $deleted = ${{variable}}->delete();
-
-        if ($deleted === false) {
-            return $response->error('Delete failed due to a database error.')->setStatus(500);
-        }
-
-        return $response->success('{{class}} deleted.')->setData('{{variable}}', ${{variable}});
+        AuthorizationHelper::authorize(${{variable}}, 'destroy', $response);
+        return DeleteHelper::executeDelete(${{variable}}, $response);
     }
 }
