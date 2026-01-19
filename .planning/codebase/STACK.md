@@ -1,95 +1,68 @@
 # Technology Stack
 
-**Analysis Date:** 2026-01-07
-
 ## Languages
 
-**Primary:**
-- PHP 8.2+ - All application code (`composer.json`)
-
-**Secondary:**
-- JavaScript - Frontend assets (`resources/js/admin.js`, `resources/js/front.js`)
-- SQL - Database migrations (`database/migrations/*.sql`)
-- SCSS - Stylesheets (`resources/sass/admin.scss`, `resources/sass/front.scss`)
+**Primary:** PHP ^8.2
 
 ## Runtime
 
-**Environment:**
-- PHP 8.2+ (strict types, match expressions, named arguments) - `composer.json`
-- WordPress environment (requires WordPress installation)
-- MySQL/MariaDB database (InnoDB engine)
+- WordPress (via TypeRocket Pro v6)
+- PHP 8.2+ required
 
-**Package Manager:**
-- Composer for PHP dependencies - `composer.json`, `composer.lock`
-- npm for frontend dependencies - `package.json`
+**Package Manager:** Composer (no lockfile - library package)
 
 ## Frameworks
 
-**Core:**
-- TypeRocket Pro v6 - WordPress MVC framework (`makermaker.php`, `app/MakermakerTypeRocketPlugin.php`)
-  - Eloquent-style ORM via `TypeRocket\Models\Model`
-  - Dependency injection in controllers
-  - Route collection system
-  - Resource registration for admin interface
-
-**Testing:**
-- Pest v2.34 - PHP testing framework (BDD-style) - `composer.json`, `tests/Pest.php`
-- PHPUnit 10.5 - Unit testing base (via Pest) - `composer.json`
-- Brain Monkey v2.6 - WordPress function mocking - `tests/Pest.php`
-
-**Build/Dev:**
-- Laravel Mix v4.0.7 - Webpack asset compilation - `webpack.mix.js`
-- Sass v1.15.2 - SCSS compilation - `package.json`
-- TypeScript v3.6.4 - Type support (configured but minimal usage) - `package.json`
+**Core:** TypeRocket Pro v6 - WordPress MVC framework (peer dependency)
 
 ## Key Dependencies
 
 **Critical:**
-- `mxcro/makermaker-core` (dev-master) - CRUD scaffolding and helper library - `composer.json`
-  - Provides: `RestIndexHelper`, `AuthorizationHelper`, `AuditTrailHelper`, `AutoCodeHelper`, `DeleteHelper`, `RestHelper`, `RedirectHelper`
-  - Location: `vendor/mxcro/makermaker-core/`
-  - Purpose: Shared abstractions for TypeRocket plugin development
-
-**Testing Infrastructure:**
-- `pestphp/pest` ^2.34 - Testing framework
-- `brain/monkey` ^2.6 - WordPress mocking
-- `mockery/mockery` ^1.6 - Object mocking
+- `typerocket/core` - MVC framework (Model, Controller, Request, Response, Registry)
+- WordPress Core - `$wpdb`, hooks, authentication
 
 **Infrastructure:**
-- TypeRocket Pro v6 framework (mu-plugin dependency)
-- WordPress core functions and hooks
-- MySQL/MariaDB via WordPress `$wpdb` wrapper
+- PHP Reflection API - Model introspection
+- PHP 8 Attributes - `#[Action]`, `#[BulkAction]`
 
 ## Configuration
 
 **Environment:**
-- WordPress configuration (wp-config.php)
-- No external environment variables required
-- Configuration via TypeRocket resource registration
+- WordPress constants: `MAKERMAKER_PLUGIN_DIR`, `WP_PLUGIN_DIR`, `WP_DEBUG`
+- Global WordPress database: `$wpdb`
 
-**Build:**
-- `webpack.mix.js` - Asset compilation configuration
-- `phpunit.xml` - Test runner configuration
-- `tests/Pest.php` - Pest test configuration
-- `composer.json` - PHP dependencies and scripts
+**Initialization:**
+```php
+MakermakerCore\Boot::init([
+    'modules_path' => PLUGIN_DIR . '/modules',
+    'config_path' => PLUGIN_DIR . '/config',
+    'views_path' => PLUGIN_DIR . '/resources/views',
+    'plugin_dir' => PLUGIN_DIR,
+    'plugin_url' => PLUGIN_URL,
+]);
+```
 
-## Platform Requirements
+## Namespace
 
-**Development:**
-- PHP 8.2 or higher
-- Composer
-- npm
-- MySQL/MariaDB
-- WordPress 5.0+ (compatible with TypeRocket Pro v6)
+**Root:** `MakermakerCore\`
 
-**Production:**
-- PHP 8.2+ environment
-- WordPress installation
-- MySQL/MariaDB database
-- Web server (Apache/Nginx)
-- TypeRocket Pro v6 mu-plugin installed
+**PSR-4:**
+```json
+{"MakermakerCore\\": "src/"}
+```
 
----
+**Auto-loaded:** `src/helpers.php`
 
-*Stack analysis: 2026-01-07*
-*Update after major dependency changes*
+## Component Locations
+
+| Component | Location |
+|-----------|----------|
+| Admin UI | `src/Admin/` |
+| REST API | `src/Rest/` |
+| CLI Commands | `src/Commands/` |
+| Helpers | `src/Helpers/`, `src/helpers.php` |
+| Attributes | `src/Attributes/` |
+| Contracts | `src/Contracts/` |
+| Templates | `resources/templates/{variant}/` |
+
+Template variants: `simple`, `standard`, `api-ready`
