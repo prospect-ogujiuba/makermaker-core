@@ -54,6 +54,7 @@ class ReflectiveQueryBuilder
 
     private Model $model;
     private Request $request;
+    private array $columnCache = [];
 
     public function __construct(Model $model, Request $request)
     {
@@ -68,22 +69,17 @@ class ReflectiveQueryBuilder
      */
     public function build()
     {
-        // Use the model instance directly
         $query = $this->model;
 
-        // Always exclude soft-deleted records
-        // Note: ->where() returns $this, so we chain from the model instance
-        $query = $query->where('deleted_at', '=', null);
+        if ($this->columnExists('deleted_at')) {
+            $query = $query->where('deleted_at', '=', null);
+        }
 
-        // Apply search if present
         if ($searchTerm = $_GET['search'] ?? null) {
             $this->applySearch($query, $searchTerm);
         }
 
-        // Apply field filters
         $this->applyFilters($query);
-
-        // Apply sorting
         $this->applySorting($query);
 
         return $query;
@@ -101,10 +97,8 @@ class ReflectiveQueryBuilder
         $perPage = $this->getPerPage();
         $page = $this->getPage();
 
-        // Use TypeRocket's built-in pagination
         $pager = $query->paginate($perPage, $page);
 
-        // Extract results and metadata - handle null safely
         $results = $pager ? $pager->getResults() : null;
         $data = $results ? (is_array($results) ? $results : $results->toArray()) : [];
 
@@ -122,6 +116,30 @@ class ReflectiveQueryBuilder
     }
 
     /**
+     * Check if column exists in model's table
+     */
+    private function columnExists(string $column): bool
+    {
+        if (isset($this->columnCache[$column])) {
+            return $this->columnCache[$column];
+        }
+
+        global $wpdb;
+        
+        $tableName = $this->model->getTable();
+        $query = $wpdb->prepare(
+            "SHOW COLUMNS FROM `{$tableName}` LIKE %s",
+            $column
+        );
+        
+        $result = $wpdb->get_results($query);
+        
+        $this->columnCache[$column] = !empty($result);
+        
+        return $this->columnCache[$column];
+    }
+
+    /**
      * Apply full-text search across searchable fields
      */
     private function applySearch($query, string $searchTerm): void
@@ -129,20 +147,20 @@ class ReflectiveQueryBuilder
         $searchable = $this->getSearchableFields();
 
         if (empty($searchable)) {
-            return; // No searchable fields
+            return;
         }
 
-        // Sanitize search term
         $searchTerm = $this->sanitizeSearchTerm($searchTerm);
 
-        // TypeRocket doesn't support closure-based where, but supports appendRawWhere()
         global $wpdb;
         $escapedTerm = $wpdb->esc_like($searchTerm);
         $escapedTerm = '%' . $escapedTerm . '%';
 
         $conditions = [];
         foreach ($searchable as $field) {
-            $conditions[] = $wpdb->prepare("`{$field}` LIKE %s", $escapedTerm);
+            if ($this->columnExists($field)) {
+                $conditions[] = $wpdb->prepare("`{$field}` LIKE %s", $escapedTerm);
+            }
         }
 
         if (!empty($conditions)) {
@@ -156,10 +174,9 @@ class ReflectiveQueryBuilder
      */
     private function applyFilters($query): void
     {
-        $queryParams = $_GET; // Use $_GET directly for URL parameters
+        $queryParams = $_GET;
         $filterable = $this->getFilterableFields();
 
-        // Reserved query parameters
         $reserved = ['search', 'orderby', 'order', 'per_page', 'page', 'with'];
 
         foreach ($queryParams as $key => $value) {
@@ -171,7 +188,10 @@ class ReflectiveQueryBuilder
                 throw new \InvalidArgumentException("Invalid filter field: {$key}");
             }
 
-            // Apply filter
+            if (!$this->columnExists($key)) {
+                throw new \InvalidArgumentException("Column does not exist: {$key}");
+            }
+
             if ($value === 'null' || $value === null) {
                 $query->where($key, '=', null);
             } else {
@@ -188,14 +208,12 @@ class ReflectiveQueryBuilder
         $orderby = $_GET['orderby'] ?? 'id';
         $order = strtolower($_GET['order'] ?? 'asc');
 
-        // Validate order direction
         if (!in_array($order, ['asc', 'desc'])) {
             $order = 'asc';
         }
 
-        // Validate sortable field
-        if (!$this->isSortableField($orderby)) {
-            $orderby = 'id'; // Fallback to safe default
+        if (!$this->isSortableField($orderby) || !$this->columnExists($orderby)) {
+            $orderby = 'id';
         }
 
         $query->orderBy($orderby, $order);
@@ -210,17 +228,14 @@ class ReflectiveQueryBuilder
      */
     private function getSearchableFields(): array
     {
-        // Check if model defines custom searchable fields
         if (method_exists($this->model, 'getSearchableFields')) {
             return $this->model->getSearchableFields();
         }
 
-        // Auto-detect from fillable fields using reflection
         $fillable = $this->getFillableProperty();
         $searchable = [];
 
         foreach ($fillable as $field) {
-            // Check if field matches text patterns
             if ($this->isTextFieldCandidate($field)) {
                 $searchable[] = $field;
             }
@@ -250,14 +265,12 @@ class ReflectiveQueryBuilder
      */
     private function isTextFieldCandidate(string $field): bool
     {
-        // Exclude fields with certain patterns
         foreach (self::EXCLUDED_FROM_SEARCH as $pattern) {
             if (stripos($field, $pattern) !== false) {
                 return false;
             }
         }
 
-        // Include fields matching text patterns
         foreach (self::TEXT_FIELD_PATTERNS as $pattern) {
             if (stripos($field, $pattern) !== false) {
                 return true;
@@ -300,8 +313,6 @@ class ReflectiveQueryBuilder
     private function getSortableFields(): array
     {
         $filterable = $this->getFilterableFields();
-
-        // Always allow sorting by these fields
         $alwaysSortable = ['id', 'created_at', 'updated_at'];
 
         return array_unique(array_merge($filterable, $alwaysSortable));
@@ -321,10 +332,8 @@ class ReflectiveQueryBuilder
      */
     private function getPerPage(): int
     {
-        // Default to 100 if not specified (no limit effectively)
         $perPage = (int) ($_GET['per_page'] ?? 100);
 
-        // Enforce minimum and maximum
         return max(1, min($perPage, 100));
     }
 
@@ -335,7 +344,6 @@ class ReflectiveQueryBuilder
     {
         $page = (int) ($_GET['page'] ?? 1);
 
-        // Ensure minimum page 1
         return max(1, $page);
     }
 
@@ -344,11 +352,8 @@ class ReflectiveQueryBuilder
      */
     private function sanitizeSearchTerm(string $term): string
     {
-        // Remove potentially dangerous characters
         $term = trim($term);
         $term = strip_tags($term);
-
-        // Escape special LIKE characters
         $term = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $term);
 
         return $term;
